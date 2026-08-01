@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Damas poliédricas</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <main id="board">
+    <canvas id="canvas"></canvas>
+
+    <div id="turn-banner" class="banner">
+      <span class="dot"></span>
+      <span class="text">Turno del jugador 1</span>
+    </div>
+
+    <div id="result-overlay" class="hidden">
+      <div class="result-card">
+        <h2 id="result-title">Fin de la partida</h2>
+        <p id="result-detail"></p>
+        <button id="result-new" class="primary">Nueva partida</button>
+      </div>
+    </div>
+
+    <div id="hint" class="hint">Arrastra para girar · rueda para acercar</div>
+  </main>
+
+  <aside id="panel">
+    <header>
+      <h1>Damas poliédricas</h1>
+      <p class="subtitle">Damas sobre los vértices de un poliedro o un grafo</p>
+    </header>
+
+    <section class="players">
+      <div class="player" data-player="0">
+        <span class="chip"></span>
+        <div class="info">
+          <strong>Jugador 1</strong>
+          <span class="stats"><span class="alive">5</span> fichas · <span class="eaten">0</span> comidas</span>
+        </div>
+      </div>
+      <div class="player" data-player="1">
+        <span class="chip"></span>
+        <div class="info">
+          <strong>Jugador 2</strong>
+          <span class="stats"><span class="alive">5</span> fichas · <span class="eaten">0</span> comidas</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="actions">
+      <button id="btn-end-turn" class="wide" disabled>Terminar turno</button>
+      <button id="btn-pause" class="wide hidden">Pausar</button>
+      <div class="row">
+        <button id="btn-undo">Deshacer</button>
+        <button id="btn-center">Centrar vista</button>
+      </div>
+      <button id="btn-new" class="wide primary">Nueva partida</button>
+    </section>
+
+    <section class="settings">
+      <h2>Jugadores</h2>
+      <label class="field">
+        <span>Jugador 1 (cian)</span>
+        <select id="sel-p0">
+          <option value="human">Humano</option>
+          <option value="ai">Ordenador</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Jugador 2 (naranja)</span>
+        <select id="sel-p1">
+          <option value="human">Humano</option>
+          <option value="ai">Ordenador</option>
+        </select>
+      </label>
+      <label class="field" id="fld-level">
+        <span>Nivel del ordenador</span>
+        <select id="sel-level">
+          <option value="facil">Fácil</option>
+          <option value="normal" selected>Normal</option>
+          <option value="dificil">Difícil</option>
+        </select>
+      </label>
+
+      <h2>Tablero</h2>
+      <label class="field">
+        <span>Tablero</span>
+        <select id="sel-poly"></select>
+      </label>
+      <label class="field">
+        <span>Ejércitos</span>
+        <select id="sel-home">
+          <option value="1">Pequeños</option>
+          <option value="2">Grandes</option>
+        </select>
+      </label>
+      <p id="poly-desc" class="note"></p>
+      <p id="preset-note" class="note preset"></p>
+
+      <h2>Reglas</h2>
+      <label class="check">
+        <input type="checkbox" id="chk-multijump" checked>
+        <span>Permitir saltos múltiples</span>
+      </label>
+      <label class="check sub" id="lbl-forced">
+        <input type="checkbox" id="chk-forced">
+        <span>Seguir saltando es obligatorio</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="chk-mandatory">
+        <span>Comer es obligatorio</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="chk-autorotate" checked>
+        <span>Girar hacia el jugador en turno</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="chk-threats">
+        <span>Marcar mis fichas en peligro</span>
+      </label>
+      <p class="note">Al cambiar el tablero o las reglas se empieza una partida nueva.</p>
+    </section>
+
+    <section class="rules">
+      <h2>Cómo se juega</h2>
+      <ul>
+        <li>Las fichas ocupan <strong>vértices</strong> y se mueven por las aristas a un vértice vecino vacío.</li>
+        <li>Para <strong>comer</strong>, salta sobre una ficha rival vecina y cae en cualquier vértice vacío contiguo a ella. El salto no tiene que ser recto.</li>
+        <li>Cada jugador empieza en una <strong>cara</strong> del sólido y el rival en la <strong>opuesta</strong>. En los tableros que son solo un grafo, cada uno sale de la <strong>zona</strong> alrededor de su polo.</li>
+        <li>Pierde quien se quede <strong>sin fichas</strong> o <strong>sin movimientos</strong>.</li>
+      </ul>
+    </section>
+
+    <section class="history">
+      <h2>Jugadas</h2>
+      <ol id="movelist"></ol>
+    </section>
+  </aside>
+
+</div>
+
+<script src="js/math3d.js"></script>
+<script src="js/graphs.js"></script>
+<script src="js/polyhedra.js"></script>
+<script src="js/presets.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
