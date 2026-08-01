@@ -205,32 +205,48 @@ condiciones, que son las que se comprueban en el análisis:
 - no se come casi nada (menos de 1 captura por partida),
 - sale siempre la misma partida.
 
-### Las mejores
+### Jugabilidad de cada tablero
 
-| Tablero | Ejército | Saltos múlt. | Jugadas | Capturas |
-| --- | --- | --- | --- | --- |
-| **Dodecaedro doble** | 13 | no | 48–106 | **17,6** |
-| **Dodecaedro** | 8 | no | 42–116 | 12,1 |
-| **Toro 6×6** | 12 | no | 53–84 | 16,7 |
-| **Cubo truncado** | 9 | no | 40–141 | 10,6 |
-| **Dodecaedro truncado** | 18 | no | 31–162 | 9,9 |
-| **Nauru** GP(12,5) | 8 | no | 41–90 | 11,3 |
-| **Desargues** GP(10,3) | 7 | no | 38–113 | 10,1 |
-| **Toro 4×6** | 8 | no | 38–88 | 11,5 |
-| Prisma octogonal | 6 | no | 14–67 | 9,7 |
-| Toro 5×5 | 8 | no | 41–78 | 11,6 |
-| Octaedro truncado | 10 | no | 31–119 | 7,3 |
-| Petersen doble | 7 | no | 13–61 | 10,4 |
-| Cuboctaedro truncado | 10 | no | 42–118 | 6,0 |
-| Prisma decagonal | 6 | no | 36–89 | 7,9 |
-| Icosidodecaedro | 6 | no | 37–98 | 4,3 |
-| Rombicuboctaedro | 6 | no | 37–67 | 7,3 |
-| Prisma dodecagonal | 6 | no | 37–83 | 6,0 |
-| Antiprisma heptagonal | 4 | no | 15–65 | 5,6 |
-| Antiprisma eneagonal | 4 | no | 40–75 | 4,8 |
-| Prisma hexagonal | 4 | no | 6–45 | 6,0 |
-| Icosaedro | 4 | no | 33–63 | 5,5 |
-| Antiprisma pentagonal | 4 | no | 5–36 | 5,8 |
+Cada tablero con su mejor configuración, ordenados por calidad de juego.
+«Ejército» son las fichas por jugador; «Resultados», victorias de quien abre /
+de quien responde / tablas sobre 20 partidas.
+
+| Tablero | V | Ejército | Jugadas | Capturas | Resultados | Valoración | Carácter |
+| --- | --: | --: | --: | --: | :-: | :-: | --- |
+| Dodecaedro doble | 40 | 13 | 48–106 | 17.6 | 0/0/20 | ★★★ | Muy táctico, capturas constantes |
+| Dodecaedro | 20 | 8 | 42–116 | 12.1 | 0/1/19 | ★★★ | Mucho combate, suele acabar en tablas |
+| Toro 6×6 | 36 | 12 | 53–84 | 16.7 | 0/0/20 | ★★★ | Muy táctico, capturas constantes |
+| Cubo truncado | 24 | 9 | 40–141 | 10.6 | 0/0/20 | ★★★ | Mucho combate, suele acabar en tablas |
+| Dodecaedro truncado | 60 | 18 | 31–162 | 9.9 | 0/0/20 | ★★★ | Mucho combate, suele acabar en tablas |
+| Nauru GP(12,5) | 24 | 8 | 41–90 | 11.3 | 0/0/20 | ★★☆ | Mucho combate, suele acabar en tablas |
+| Desargues GP(10,3) | 20 | 7 | 38–113 | 10.1 | 0/0/20 | ★★☆ | Mucho combate, suele acabar en tablas |
+| Toro 4×6 | 24 | 8 | 38–88 | 11.5 | 0/0/20 | ★★☆ | Mucho combate, suele acabar en tablas |
+| Toro 5×5 | 25 | 8 | 41–78 | 11.6 | 0/0/20 | ★★☆ | Mucho combate, suele acabar en tablas |
+| Prisma octogonal | 16 | 6 | 14–67 | 9.7 | 0/2/18 | ★★☆ | Mucho combate, suele acabar en tablas |
+| Octaedro truncado | 24 | 10 | 31–119 | 7.3 | 0/0/20 | ★★☆ | Combate moderado |
+| Cuboctaedro truncado | 48 | 10 | 42–118 | 6.0 | 0/0/20 | ★★☆ | Combate moderado |
+| Petersen doble | 20 | 7 | 13–61 | 10.4 | 4/1/15 | ★★ | Mucho combate, suele acabar en tablas |
+| Prisma decagonal | 20 | 6 | 36–89 | 7.9 | 0/1/19 | ★★ | Combate moderado |
+| Icosidodecaedro | 30 | 6 | 37–98 | 4.3 | 0/0/20 | ★★ | Duración muy variable, poco contacto |
+| Rombicuboctaedro | 24 | 6 | 37–67 | 7.3 | 0/0/20 | ★★ | Combate moderado |
+| Prisma dodecagonal | 24 | 6 | 37–83 | 6.0 | 0/0/20 | ★★ | Combate moderado |
+| Möbius–Kantor GP(8,3) | 16 | 5 | 8–67 | 6.4 | 1/0/19 | ★★ | Combate moderado |
+| Antiprisma heptagonal | 14 | 4 | 15–65 | 5.6 | 1/0/19 | ★★ | Combate moderado |
+| Antiprisma eneagonal | 18 | 4 | 40–75 | 4.8 | 0/0/20 | ★☆ | Poco contacto |
+| Prisma hexagonal | 12 | 4 | 6–45 | 6.0 | 2/6/12 | ★☆ | Combate moderado |
+| Icosaedro | 12 | 4 | 33–63 | 5.5 | 0/0/20 | ★☆ | Combate moderado |
+| Antiprisma pentagonal | 10 | 4 | 5–36 | 5.8 | 0/10/10 | ★☆ | Decisivo, con ventaja para un bando |
+| Grafo de Petersen | 10 | 3 | 33–63 | 3.0 | 0/0/20 | ★ | Poco contacto |
+| Icosaedro truncado | 60 | 10 | 31–77 | 1.1 | 0/0/20 | ★ | Duración muy variable, poco contacto |
+
+Las estrellas resumen la puntuación descrita arriba: duración y variedad de
+duración, capturas por partida, equilibrio entre bandos y proporción de partidas
+decisivas. Que muchos acaben en tablas no los descalifica: entre dos ordenadores
+del mismo nivel y con material simétrico es lo esperable, igual que en las damas
+planas; lo que mide la tabla es si hay juego por el camino.
+
+Sin ninguna variante jugable: **cuboctaedro**, **teseracto**,
+**rombicosidodecaedro** e **icosidodecaedro truncado**.
 
 ### Los dos fallos característicos
 
