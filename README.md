@@ -154,6 +154,13 @@ son el ajuste por defecto: más contacto y muchas más capturas.
 - «Girar hacia el jugador en turno» reorienta la vista al cambiar de turno para
   que siempre veas tu cara de salida.
 
+En pantallas estrechas el panel se reorganiza en pestañas (Partida, Tablero,
+Reglas, Jugadas), y en apaisado vuelve a dos columnas. Con pantalla táctil el
+margen de acierto al señalar un vértice sube de 10 a 22 px: en un tablero de 60
+vértices una ficha mide unos 12 px y con el dedo sería inalcanzable. Ampliarlo
+no vuelve ambigua la elección porque, entre los candidatos dentro del margen,
+gana el que está más cerca de la cámara.
+
 ## Estructura
 
 ```

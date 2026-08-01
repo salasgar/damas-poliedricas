@@ -21,6 +21,9 @@ class Renderer {
     this.orientation = Q.identity();
     this.camDist = 3.8;
     this.zoom = 1;
+    /* Radio mínimo de acierto al señalar un vértice. Con puntero grueso (dedo)
+       se amplía hasta el objetivo táctil recomendado. */
+    this.touchSlop = window.matchMedia('(pointer: coarse)').matches ? 22 : 10;
     /* Al orientar una cara hacia la cámara la dejamos inclinada: de frente
        exacto el poliedro se ve como un polígono plano y se pierde el volumen. */
     this.tilt = 0.42;
@@ -139,16 +142,25 @@ class Renderer {
   }
 
   /* Vértice más cercano al punto (x, y) de pantalla, o null.
-     Con empates gana el que esté más cerca de la cámara. */
+     Con empates gana el que esté más cerca de la cámara.
+
+     `touchSlop` es el margen de acierto alrededor de la ficha. Con el dedo hace
+     falta mucho más que con el ratón: en los tableros de 60 vértices una ficha
+     mide unos 12 px en pantalla y sería imposible acertarle. Aquí sí conviene
+     pasarse: como gana el candidato más cercano a la cámara, ampliar el margen
+     no hace ambiguo el resultado, solo más tolerante. */
   pickVertex(x, y, projected) {
     const pts = projected || this.projectAll();
     let best = null;
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i];
-      const radius = this.pieceRadius(p) + 8;
+      const radius = Math.max(this.pieceRadius(p) + 8, this.touchSlop);
       const d = Math.hypot(p.x - x, p.y - y);
       if (d > radius) continue;
-      if (!best || p.depth < best.depth) best = { index: i, depth: p.depth };
+      // Empatan por cercanía al puntero si ambos están dentro del margen;
+      // desempata la profundidad, y a igual profundidad el más pegado al dedo.
+      const score = p.depth + d / 400;
+      if (!best || score < best.score) best = { index: i, score };
     }
     return best ? best.index : null;
   }

@@ -78,9 +78,11 @@
   let needsRender = true;
   let lastTime = performance.now();
 
-  /* Turno del ordenador: temporizador pendiente y pausa manual. */
+  /* Turno del ordenador: temporizador pendiente, pausa manual y aviso de que
+     está calculando (la búsqueda bloquea, así que conviene decirlo antes). */
   let aiTimer = null;
   let paused = false;
+  let aiThinking = false;
 
   const isAI = (player) => settings.players[player] === 'ai';
   const bothAI = () => isAI(0) && isAI(1);
@@ -206,6 +208,7 @@
       clearTimeout(aiTimer);
       aiTimer = null;
     }
+    aiThinking = false;
   }
 
   /* Programa la jugada del ordenador si le toca. El retardo dentro de una
@@ -214,6 +217,10 @@
     cancelAI();
     if (!waitingForAI()) return;
     const delay = game.chain !== null ? 260 : 420;
+    /* Marcamos "pensando" antes del temporizador: así el aviso llega a pintarse
+       durante la espera, porque la búsqueda en sí bloquea el hilo. */
+    aiThinking = true;
+    updateBanner();
     aiTimer = setTimeout(runAIMove, delay);
   }
 
@@ -222,6 +229,7 @@
     if (!waitingForAI()) return;
 
     const move = chooseMove(game, settings.level);
+    aiThinking = false;
     if (!move) return;
 
     clearSelection();
@@ -264,8 +272,28 @@
 
   /* ---------- Panel ---------- */
 
+  const PLAYER_NAMES = ['jugador 1', 'jugador 2'];
+
+  function updateBanner() {
+    const banner = $('turn-banner');
+    const color = PLAYER_COLORS[game.turn].base;
+    banner.querySelector('.dot').style.background = color;
+    banner.querySelector('.dot').style.color = color;
+
+    const ai = isAI(game.turn);
+    const who = ai ? `${PLAYER_NAMES[game.turn]} (ordenador)` : PLAYER_NAMES[game.turn];
+    let text;
+    if (game.result) text = 'Partida terminada';
+    else if (paused && ai) text = `En pausa · turno del ${who}`;
+    else if (aiThinking) text = `Pensando… · ${who}`;
+    else if (game.chain !== null) text = `El ${who} puede seguir comiendo`;
+    else text = `Turno del ${who}`;
+    banner.querySelector('.text').textContent = text;
+    banner.classList.toggle('thinking', aiThinking && !game.result);
+  }
+
   function syncPanel() {
-    const names = ['jugador 1', 'jugador 2'];
+    const names = PLAYER_NAMES;
     const alive = [game.piecesOf(0).length, game.piecesOf(1).length];
 
     document.querySelectorAll('.player').forEach((el) => {
@@ -276,15 +304,7 @@
       el.querySelector('.eaten').textContent = game.captured[p];
     });
 
-    const banner = $('turn-banner');
-    banner.querySelector('.dot').style.background = PLAYER_COLORS[game.turn].base;
-    banner.querySelector('.dot').style.color = PLAYER_COLORS[game.turn].base;
-    const who = isAI(game.turn) ? `${names[game.turn]} (ordenador)` : names[game.turn];
-    banner.querySelector('.text').textContent = game.chain !== null
-      ? `El ${who} puede seguir comiendo`
-      : paused && isAI(game.turn)
-        ? `En pausa · turno del ${who}`
-        : `Turno del ${who}`;
+    updateBanner();
 
     // «Terminar turno» es cosa del humano: la IA decide sola si se planta.
     const canStop = game.canEndTurn() && !isAI(game.turn);
@@ -600,6 +620,20 @@
     computeThreats();
     needsRender = true;
   });
+
+  /* Pestañas del panel: en pantallas anchas el CSS las oculta y se ve todo
+     seguido, así que esto solo tiene efecto en móvil. */
+  for (const tab of document.querySelectorAll('.tab')) {
+    tab.addEventListener('click', () => {
+      const name = tab.dataset.tab;
+      for (const t of document.querySelectorAll('.tab')) {
+        t.classList.toggle('active', t === tab);
+      }
+      for (const pane of document.querySelectorAll('.pane')) {
+        pane.classList.toggle('active', pane.dataset.pane === name);
+      }
+    });
+  }
 
   window.addEventListener('resize', () => {
     renderer.resize();
