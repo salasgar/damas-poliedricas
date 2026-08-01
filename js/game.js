@@ -13,9 +13,16 @@
    Los ejércitos empiezan en dos caras opuestas del poliedro. */
 
 const EMPTY = -1;
-const PLAYERS = [0, 1];
 
 const DEFAULT_OPTIONS = {
+  /* Número de bandos. Con más de dos, el reparto se hace por zonas alrededor
+     de polos dispersos y el turno rota entre los que siguen en juego. */
+  playerCount: 2,
+  /* Cómo se decide el ganador con más de dos jugadores:
+     'elimination' – gana el último que queda con fichas
+     'points'      – gana quien más fichas haya comido al acabar la partida,
+                     también si le eliminaron por el camino */
+  victory: 'elimination',
   /* Si hay capturas disponibles, ¿obliga a hacerlas? */
   mandatoryCapture: false,
   /* Encadenar capturas con la misma ficha:
@@ -45,17 +52,24 @@ class Game {
        un grafo, de una bola más grande alrededor de su polo. Es la variante que
        hace viables los tableros pequeños, donde una sola cadena de saltos
        barría un ejército entero. */
-    const home = this.poly.homes[this.options.homeSize] || this.poly.homes[1];
+    const wanted = this.options.playerCount;
+    const home =
+      boardHomes(this.poly, wanted, this.options.homeSize) ||
+      boardHomes(this.poly, wanted, 1) ||
+      boardHomes(this.poly, 2, this.options.homeSize);
+    this.playerCount = home.sets.length;
 
     this.homeFaceSets = home.faces;   // caras que se tiñen del color de cada bando
     this.homeDirections = home.dirs;  // hacia dónde mira la cámara en cada turno
 
-    for (const v of home.sets[0]) this.pieces[v] = 0;
-    for (const v of home.sets[1]) this.pieces[v] = 1;
+    home.sets.forEach((set, player) => {
+      for (const v of set) this.pieces[v] = player;
+    });
 
     this.turn = 0;
     this.chain = null;          // vértice obligado a seguir comiendo, o null
-    this.captured = [0, 0];     // fichas comidas por cada jugador
+    this.captured = new Array(this.playerCount).fill(0);
+    this.eliminated = new Array(this.playerCount).fill(false);
     this.pliesWithoutCapture = 0;
     this.moveNumber = 1;
     this.history = [];          // para deshacer
@@ -63,8 +77,24 @@ class Game {
     this.result = null;         // {winner, reason} cuando la partida acaba
   }
 
+  /* Con dos jugadores, "el rival". Con más, se usa `isEnemy`. */
   get opponent() {
-    return 1 - this.turn;
+    return (this.turn + 1) % this.playerCount;
+  }
+
+  /* ¿Hay en `v` una ficha que yo pueda comer? Cualquier bando distinto del mío
+     cuenta: con más de dos jugadores todos son rivales de todos. */
+  isEnemy(v) {
+    const owner = this.pieces[v];
+    return owner !== EMPTY && owner !== this.turn;
+  }
+
+  activePlayers() {
+    const out = [];
+    for (let p = 0; p < this.playerCount; p++) {
+      if (!this.eliminated[p]) out.push(p);
+    }
+    return out;
   }
 
   piecesOf(player) {
@@ -82,10 +112,9 @@ class Game {
     if (this.pieces[from] !== this.turn) return [];
     if (this.chain !== null && this.chain !== from) return [];
 
-    const rival = this.opponent;
     const jumps = [];
     for (const over of this.poly.neighbors[from]) {
-      if (this.pieces[over] !== rival) continue;
+      if (!this.isEnemy(over)) continue;
       for (const to of this.poly.neighbors[over]) {
         if (to !== from && this.pieces[to] === EMPTY) {
           jumps.push({ from, to, over, capture: true });
@@ -130,6 +159,7 @@ class Game {
       turn: this.turn,
       chain: this.chain,
       captured: this.captured.slice(),
+      eliminated: this.eliminated.slice(),
       pliesWithoutCapture: this.pliesWithoutCapture,
       moveNumber: this.moveNumber,
       logLength: this.log.length,
@@ -142,6 +172,7 @@ class Game {
     this.turn = s.turn;
     this.chain = s.chain;
     this.captured = s.captured.slice();
+    this.eliminated = s.eliminated.slice();
     this.pliesWithoutCapture = s.pliesWithoutCapture;
     this.moveNumber = s.moveNumber;
     this.log.length = s.logLength;
@@ -205,10 +236,9 @@ class Game {
 
   /* Saltos disponibles desde `v` una vez la ficha ya ha aterrizado ahí. */
   movesFromAfterCapture(v) {
-    const rival = this.opponent;
     const jumps = [];
     for (const over of this.poly.neighbors[v]) {
-      if (this.pieces[over] !== rival) continue;
+      if (!this.isEnemy(over)) continue;
       for (const to of this.poly.neighbors[over]) {
         if (this.pieces[to] === EMPTY) jumps.push({ from: v, to, over, capture: true });
       }
@@ -219,24 +249,96 @@ class Game {
   endTurn() {
     if (this.result) return;
     this.chain = null;
-    if (this.turn === 1) this.moveNumber++;
-    this.turn = this.opponent;
+    if (this.turn === this.playerCount - 1) this.moveNumber++;
+    this.turn = (this.turn + 1) % this.playerCount;
     this.checkEnd();
   }
 
-  /* Se pierde al quedarse sin fichas o sin movimientos legales. */
+  /* Quien se queda sin fichas queda eliminado.
+
+     Quedarse sin movimientos es distinto según cuántos jueguen. Con dos, es
+     derrota inmediata, como en las damas de siempre. Con más de dos no puede
+     serlo: el bloqueo suele ser temporal, porque en cuanto otro mueva sus
+     fichas puede abrirse hueco otra vez, así que ese jugador simplemente pasa
+     el turno. */
   checkEnd() {
-    if (this.piecesOf(this.turn).length === 0) {
-      this.result = { winner: this.opponent, reason: 'sin-fichas' };
+    if (this.result) return;
+
+    for (let p = 0; p < this.playerCount; p++) {
+      if (!this.eliminated[p] && this.piecesOf(p).length === 0) {
+        this.eliminated[p] = true;
+      }
+    }
+
+    if (this.playerCount === 2) {
+      const rival = 1 - this.turn;
+      if (this.eliminated[this.turn]) {
+        this.result = { winner: rival, reason: 'sin-fichas' };
+        return;
+      }
+      if (this.legalMoves().length === 0) {
+        this.result = { winner: rival, reason: 'bloqueado' };
+        return;
+      }
+      if (this.pliesWithoutCapture >= this.options.drawPlies) {
+        this.result = { winner: null, reason: 'tablas' };
+      }
       return;
     }
-    if (this.legalMoves().length === 0) {
-      this.result = { winner: this.opponent, reason: 'bloqueado' };
+
+    const active = this.activePlayers();
+    if (active.length <= 1) {
+      this.result = { winner: active[0] ?? null, reason: 'sin-fichas' };
+      this.applyVictoryRule();
       return;
     }
     if (this.pliesWithoutCapture >= this.options.drawPlies) {
       this.result = { winner: null, reason: 'tablas' };
+      this.applyVictoryRule();
+      return;
     }
+
+    // Pasa turno quien no tenga jugada; si nadie puede mover, tablas.
+    let guard = 0;
+    while (
+      (this.eliminated[this.turn] || this.legalMoves().length === 0) &&
+      guard++ < this.playerCount
+    ) {
+      if (this.turn === this.playerCount - 1) this.moveNumber++;
+      this.turn = (this.turn + 1) % this.playerCount;
+    }
+    if (guard >= this.playerCount) {
+      this.result = { winner: null, reason: 'bloqueo-general' };
+      this.applyVictoryRule();
+    }
+  }
+
+  /* Con la regla por puntos, el ganador es quien más ha comido, aunque le
+     hubieran eliminado. Sirve contra el "kingmaking": si te eliminan pronto tu
+     marcador sigue contando, así que no te da igual a quién ayudas. */
+  applyVictoryRule() {
+    if (this.options.victory !== 'points' || !this.result) return;
+    let best = [];
+    let top = -1;
+    for (let p = 0; p < this.playerCount; p++) {
+      const score = this.captured[p];
+      if (score > top) {
+        top = score;
+        best = [p];
+      } else if (score === top) {
+        best.push(p);
+      }
+    }
+    // Desempata quien conserve más fichas en el tablero.
+    if (best.length > 1) {
+      best.sort((a, b) => this.piecesOf(b).length - this.piecesOf(a).length);
+      const survivors = this.piecesOf(best[0]).length;
+      if (this.piecesOf(best[1]).length === survivors) {
+        this.result = { winner: null, reason: 'empate-a-puntos' };
+        return;
+      }
+    }
+    this.result = { winner: best[0], reason: 'puntos' };
   }
 
   undo() {

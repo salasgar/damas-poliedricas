@@ -19,8 +19,9 @@ navegador y ya está.
 - **Salida.** Cada jugador coloca sus fichas en los vértices de una cara (o de
   dos caras contiguas), y el rival en las **caras opuestas**. Como el reparto es
   por caras opuestas, siempre son 2 jugadores.
-- **Final.** Pierde quien se quede sin fichas o sin movimientos legales. Si
-  pasan 60 semimovimientos sin comer nada, tablas.
+- **Final.** A dos jugadores, pierde quien se quede sin fichas o sin movimientos
+  legales. Si pasan 60 semimovimientos sin comer nada, tablas. A tres o cuatro,
+  ver más abajo.
 
 ### Reglas opcionales
 
@@ -36,11 +37,56 @@ una variante aburrida, tendrás que desmarcarlas a mano.
 
 ## Jugadores
 
-Cada bando se configura por separado como **Humano** u **Ordenador**, así que
-valen las cuatro combinaciones: humano contra humano en el mismo dispositivo,
-humano contra la máquina en cualquiera de los dos colores, y máquina contra
-máquina para ver partidas de demostración. Con dos ordenadores aparece un botón
-de **Pausar/Reanudar**.
+De **dos a cuatro** bandos, y cada uno se configura por separado como **Humano**
+u **Ordenador**: humanos en el mismo dispositivo, contra la máquina en cualquier
+color, o todos máquina para ver partidas de demostración. Cuando los lleva todos
+el ordenador aparece un botón de **Pausar/Reanudar**.
+
+### Tres y cuatro jugadores
+
+Con más de dos bandos todos son rivales de todos: se puede comer a cualquiera.
+Hay dos diferencias de reglas respecto al duelo:
+
+- **Quedarse sin movimientos no elimina, solo pasa turno.** A dos jugadores estar
+  bloqueado es derrota, como en las damas de siempre; a tres o cuatro el bloqueo
+  casi siempre es temporal, porque en cuanto otro mueva sus fichas vuelve a haber
+  hueco. Solo se elimina a quien se queda sin fichas.
+- **Se gana por puntos, no por eliminación.** Es el ajuste por defecto, y no es
+  una preferencia: con la regla de «el último en pie», **120 de 120 partidas
+  simuladas acabaron en tablas**, porque aniquilar a dos o tres rivales con
+  fuerzas parejas casi nunca ocurre antes del límite de tablas. Contando fichas
+  comidas, los resultados se reparten:
+
+| Tablero | 3 jugadores | 4 jugadores |
+| --- | --- | --- |
+| Dodecaedro doble | 3/2/5 · 2 tablas | 3/2/2/3 · 2 tablas |
+| Nauru | 2/3/3 · 4 tablas | 2/3/2/3 · 2 tablas |
+| Icosidodecaedro | 3/5/2 · 2 tablas | 5/1/1/2 · 3 tablas |
+| Dodecaedro truncado | 2/6/4 · 0 tablas | 2/7/2/1 · 0 tablas |
+| Toro 6×6 | 2/0/10 · 0 tablas | 2/2/3/4 · 1 tabla |
+
+  (victorias por bando, 12 partidas cada casilla; con eliminación todas esas
+  casillas serían «0/0/0 · 12 tablas»).
+
+  Puntuar por fichas comidas también suaviza el **kingmaking**: si te eliminan
+  pronto tu marcador sigue contando, así que no te da igual a quién ayudas por
+  el camino. La regla de eliminación sigue disponible en el panel.
+
+**Qué tableros lo admiten.** Quince de los veintinueve. Los de menos de 24
+vértices quedan fuera: tres o cuatro ejércitos no dejan sitio para maniobrar.
+
+**El multijugador rescata los tableros grandes.** Los tres sólidos que a dos
+jugadores eran inservibles por parálisis —nadie atacaba y no se comía una sola
+ficha— resultan ser los mejores a tres y cuatro, porque con más ejércitos el
+contacto es inevitable:
+
+| Tablero | Capturas a 2 jug. | A 3 jug. | A 4 jug. |
+| --- | --: | --: | --: |
+| Icosidodecaedro truncado (120 v) | 0,0 | 27,8 | **48,8** |
+| Rombicosidodecaedro (60 v) | 0,0 | 27,9 | 34,3 |
+| Icosaedro truncado (60 v) | 1,1 | 27,8 | 33,8 |
+| Dodecaedro truncado (60 v) | 9,9 | 21,7 | 29,4 |
+| Toro 6×6 (36 v) | 16,7 | 14,1 | 15,6 |
 
 El ordenador tiene tres niveles (profundidad de búsqueda 2, 4 y 6). En pruebas
 de 60 partidas por emparejamiento, alternando colores, sobre el dodecaedro:
@@ -56,6 +102,15 @@ se recorre por semimovimientos y no por turnos: cuando una ficha encadena
 capturas el turno no cambia, así que el mismo bando vuelve a decidir en el nodo
 hijo y la búsqueda nunca corta a mitad de una captura múltiple. Plantarse en
 medio de una cadena entra en la búsqueda como una jugada más.
+
+Con más de dos bandos el minimax no vale, porque no hay un único adversario cuya
+pérdida sea mi ganancia. La búsqueda pasa a ser **paranoid**: el jugador que
+mueve maximiza y todos los demás minimizan *su* puntuación, como si estuvieran
+aliados contra él. Es pesimista —en realidad los rivales también se pelean entre
+sí— pero conserva la poda alfa-beta, que es lo que max^n no permite. Con dos
+jugadores es exactamente el minimax de antes. La evaluación se generaliza a «mis
+fichas menos las del rival que mejor esté», que es a quien de verdad hay que
+ganar.
 
 ## Tableros
 
@@ -136,6 +191,13 @@ cada jugador ocupa los vértices que le quedan más cerca, ordenando por la
 diferencia de distancias a uno y otro polo. Es la traducción exacta de "salir de
 caras opuestas" cuando no hay caras.
 
+Con **tres o cuatro jugadores** se generaliza igual en todos los tableros, sean
+sólidos o no: los polos se eligen por dispersión voraz —el primero es el extremo
+de un diámetro y cada siguiente es el vértice que maximiza la distancia mínima a
+los ya elegidos—, cada vértice va al polo que tenga más cerca y de cada zona se
+toman los más próximos a su polo, recortando todos los ejércitos al mismo tamaño
+para que nadie salga con ventaja.
+
 ### Ejércitos pequeños o grandes
 
 Cada bando puede salir de **una** cara o de **dos caras que compartan arista**;
@@ -154,8 +216,16 @@ son el ajuste por defecto: más contacto y muchas más capturas.
 - «Girar hacia el jugador en turno» reorienta la vista al cambiar de turno para
   que siempre veas tu cara de salida.
 
+Las fichas se desplazan con una animación corta al moverse, y la ficha comida se
+desvanece: sin eso las jugadas del ordenador son saltos instantáneos difíciles
+de seguir.
+
 En pantallas estrechas el panel se reorganiza en pestañas (Partida, Tablero,
-Reglas, Jugadas), y en apaisado vuelve a dos columnas. Con pantalla táctil el
+Reglas, Jugadas), y en apaisado vuelve a dos columnas. Además el tablero de
+salida se elige según la pantalla: en móvil no se arranca en un sólido de 60 o
+120 vértices, que saldría diminuto y con las fichas amontonadas, sino en el mejor
+tablero que no pase de 30 vértices. Un `#idDelTablero` en la URL manda siempre
+sobre esa elección. Con pantalla táctil el
 margen de acierto al señalar un vértice sube de 10 a 22 px: en un tablero de 60
 vértices una ficha mide unos 12 px y con el dedo sería inalcanzable. Ampliarlo
 no vuelve ambigua la elección porque, entre los candidatos dentro del margen,
@@ -304,6 +374,8 @@ decididas de antemano.
 
 ## Ideas pendientes
 
-- Rival por ordenador (ahora se juega a dos en el mismo dispositivo).
-- Coronación: fichas que llegan a la cara contraria y ganan algún privilegio.
+- Coronación: fichas que llegan a la zona contraria y ganan algún privilegio.
 - Partidas por red y guardar/cargar posiciones.
+- Equipos (2 contra 2) en los tableros grandes.
+- Más grafos: producto por K₂ de los mejores tableros, cilindro y banda de
+  Möbius, esferas geodésicas, circulantes C_n(1,k).

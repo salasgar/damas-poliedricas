@@ -22,14 +22,16 @@ const W_MATERIAL = 100;
 const W_MOBILITY = 2;
 const W_HANGING = 7;
 
-/* Puntuación de la posición desde el punto de vista del jugador 0.
-   Positivo favorece al jugador 0. */
-function evaluate(game) {
+/* Puntuación de la posición desde el punto de vista de `me`. Positivo, mejor
+   para `me`. Con más de dos jugadores se compara contra el rival que mejor
+   está, que es a quien de verdad hay que ganar. */
+function evaluate(game, me) {
   const pieces = game.pieces;
   const neighbors = game.poly.neighbors;
-  const material = [0, 0];
-  const mobility = [0, 0];
-  const hanging = [0, 0];
+  const n = game.playerCount;
+  const material = new Array(n).fill(0);
+  const mobility = new Array(n).fill(0);
+  const hanging = new Array(n).fill(0);
 
   for (let v = 0; v < pieces.length; v++) {
     const owner = pieces[v];
@@ -38,11 +40,11 @@ function evaluate(game) {
 
     let empties = 0;
     let enemies = 0;
-    for (const n of neighbors[v]) {
-      if (pieces[n] === EMPTY) {
+    for (const nb of neighbors[v]) {
+      if (pieces[nb] === EMPTY) {
         empties++;
         mobility[owner]++;
-      } else if (pieces[n] !== owner) {
+      } else if (pieces[nb] !== owner) {
         enemies++;
       }
     }
@@ -51,19 +53,25 @@ function evaluate(game) {
     if (enemies > 0 && empties > 0) hanging[owner]++;
   }
 
+  // El mejor de los demás: con dos jugadores es simplemente el otro.
+  let rival = -1;
+  for (let p = 0; p < n; p++) {
+    if (p !== me && (rival < 0 || material[p] > material[rival])) rival = p;
+  }
+
   return (
-    W_MATERIAL * (material[0] - material[1]) +
-    W_MOBILITY * (mobility[0] - mobility[1]) -
-    W_HANGING * (hanging[0] - hanging[1])
+    W_MATERIAL * (material[me] - material[rival]) +
+    W_MOBILITY * (mobility[me] - mobility[rival]) -
+    W_HANGING * (hanging[me] - hanging[rival])
   );
 }
 
 /* Las victorias rápidas valen más que las lentas, para que la IA remate. */
-function terminalScore(game, ply) {
+function terminalScore(game, ply, me) {
   const { winner } = game.result;
   if (winner === null) return 0;
   const score = WIN_SCORE - ply;
-  return winner === 0 ? score : -score;
+  return winner === me ? score : -score;
 }
 
 /* Capturas primero: mejora mucho la poda. */
@@ -71,14 +79,20 @@ function orderMoves(moves) {
   return moves.slice().sort((a, b) => (b.capture ? 1 : 0) - (a.capture ? 1 : 0));
 }
 
-function search(game, depth, alpha, beta, ply, counter) {
-  if (game.result) return terminalScore(game, ply);
-  if (depth <= 0) return evaluate(game);
+/* Búsqueda "paranoid": el jugador `me` maximiza y TODOS los demás minimizan su
+   puntuación, como si estuvieran aliados contra él. Con dos jugadores es
+   exactamente el minimax de siempre; con más, es la forma habitual de conservar
+   la poda alfa-beta, que max^n no permite. Es pesimista —los rivales también
+   se pelean entre ellos— pero no se deja comer por descuido. */
+function search(game, depth, alpha, beta, ply, counter, me) {
+  if (game.result) return terminalScore(game, ply, me);
+  if (depth <= 0) return evaluate(game, me);
   counter.nodes++;
 
-  const maximizing = game.turn === 0;
+  const turnBefore = game.turn;
+  const maximizing = turnBefore === me;
   const moves = orderMoves(game.legalTurnOptions());
-  if (!moves.length) return evaluate(game);
+  if (!moves.length) return evaluate(game, me);
 
   let best = maximizing ? -Infinity : Infinity;
   for (const move of moves) {
@@ -89,14 +103,15 @@ function search(game, depth, alpha, beta, ply, counter) {
     /* Seguir una cadena es parte del mismo turno: no consume profundidad,
        porque si no la búsqueda se cortaría en mitad de una captura múltiple
        y valoraría posiciones imposibles. */
-    const sameTurn = game.turn === (maximizing ? 0 : 1) && !move.pass;
+    const sameTurn = game.turn === turnBefore && !move.pass;
     const score = search(
       game,
       sameTurn ? depth : depth - 1,
       alpha,
       beta,
       ply + 1,
-      counter
+      counter,
+      me
     );
     game.restore(state);
 
@@ -120,31 +135,34 @@ function chooseMove(game, levelName, random = Math.random) {
   const moves = orderMoves(game.legalTurnOptions());
   if (!moves.length) return null;
 
-  const maximizing = game.turn === 0;
+  /* Siempre buscamos desde el punto de vista del que mueve, así que en la raíz
+     siempre se maximiza. */
+  const me = game.turn;
   const counter = { nodes: 0 };
   let best = null;
-  let bestScore = maximizing ? -Infinity : Infinity;
+  let bestScore = -Infinity;
 
   for (const move of moves) {
     const state = game.snapshot();
     if (move.pass) game.endTurn();
     else game.play(move);
 
-    const sameTurn = game.turn === (maximizing ? 0 : 1) && !move.pass;
+    const sameTurn = game.turn === me && !move.pass;
     let score = search(
       game,
       sameTurn ? level.depth : level.depth - 1,
       -Infinity,
       Infinity,
       1,
-      counter
+      counter,
+      me
     );
     game.restore(state);
 
     // Ruido para que no repita siempre la misma partida.
     if (level.noise) score += (random() - 0.5) * 2 * level.noise;
 
-    if (maximizing ? score > bestScore : score < bestScore) {
+    if (score > bestScore) {
       bestScore = score;
       best = move;
     }

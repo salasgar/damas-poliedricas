@@ -6,10 +6,21 @@
   const canvas = document.getElementById('canvas');
   const $ = (id) => document.getElementById(id);
 
+  /* Pantalla pequeña o manejo con el dedo: el tablero por defecto tiene que ser
+     uno que se lea bien ahí, no uno de 60 o 120 vértices. */
+  const isSmallScreen =
+    window.matchMedia('(max-width: 820px)').matches ||
+    window.matchMedia('(pointer: coarse)').matches;
+
   const settings = {
-    polyId: 'dodecahedron',
-    /* 'human' u 'ai' para cada bando: las cuatro combinaciones son válidas. */
-    players: ['human', 'ai'],
+    polyId: defaultBoardId(isSmallScreen),
+    playerCount: 2,
+    /* Con tres o cuatro bandos, eliminar a todos los rivales es tan difícil que
+       casi todas las partidas acababan en tablas; por puntos quedan repartidas.
+       Con dos jugadores esta opción no se usa. */
+    victory: 'points',
+    /* 'human' u 'ai' para cada bando. */
+    players: ['human', 'ai', 'ai', 'ai'],
     level: 'normal',
     /* Saltos múltiples: encadenar varias capturas con la misma ficha en un
        mismo turno. Si están apagados, el turno pasa en cuanto se come. */
@@ -34,6 +45,52 @@
     settings.mandatoryCapture = preset.mandatoryCapture;
     syncSettingControls();
     $('preset-note').textContent = preset.reason || '';
+  }
+
+  /* Marcadores y selectores Humano/Ordenador: uno por jugador, así que se
+     regeneran cuando cambia cuántos juegan. */
+  function buildPlayerControls() {
+    const n = settings.playerCount;
+
+    const marks = $('players');
+    marks.innerHTML = '';
+    for (let p = 0; p < n; p++) {
+      const el = document.createElement('div');
+      el.className = 'player';
+      el.dataset.player = p;
+      el.style.color = PLAYER_COLORS[p].base;
+      el.innerHTML =
+        '<span class="chip"></span><div class="info">' +
+        `<strong>Jugador ${p + 1}</strong>` +
+        '<span class="stats"><span class="alive">0</span> fichas · ' +
+        '<span class="eaten">0</span> comidas</span></div>';
+      marks.appendChild(el);
+    }
+
+    const roles = $('player-roles');
+    roles.innerHTML = '';
+    for (let p = 0; p < n; p++) {
+      const label = document.createElement('label');
+      label.className = 'field';
+      label.innerHTML =
+        `<span>Jugador ${p + 1} (${PLAYER_COLORS[p].name})</span>` +
+        `<select id="sel-p${p}"><option value="human">Humano</option>` +
+        '<option value="ai">Ordenador</option></select>';
+      roles.appendChild(label);
+      const sel = label.querySelector('select');
+      sel.value = settings.players[p];
+      sel.addEventListener('change', () => {
+        settings.players[p] = sel.value;
+        paused = false;
+        clearSelection();
+        syncPanel();
+        needsRender = true;
+        scheduleAI();
+      });
+    }
+
+    // Ganar por puntos solo tiene sentido con más de dos bandos.
+    $('fld-victory').classList.toggle('hidden', n === 2);
   }
 
   /* Vuelca `settings` en los controles del panel. */
@@ -85,7 +142,9 @@
   let aiThinking = false;
 
   const isAI = (player) => settings.players[player] === 'ai';
-  const bothAI = () => isAI(0) && isAI(1);
+  /* Todos los bandos en juego los lleva el ordenador: entonces la partida corre
+     sola y tiene sentido ofrecer pausa. */
+  const allAI = () => game.activePlayers().every((p) => isAI(p));
   const waitingForAI = () => !game.result && isAI(game.turn) && !paused;
 
   /* ---------- Arranque ---------- */
@@ -98,7 +157,15 @@
       chainCaptures: chainRule(),
       mandatoryCapture: settings.mandatoryCapture,
       homeSize: settings.homeSize,
+      playerCount: settings.playerCount,
+      victory: settings.victory,
     });
+    // El tablero puede no admitir tantos bandos: mandan los que se han repartido.
+    if (game.playerCount !== settings.playerCount) {
+      settings.playerCount = game.playerCount;
+      $('sel-count').value = String(game.playerCount);
+      buildPlayerControls();
+    }
 
     if (!renderer) {
       renderer = new Renderer(canvas, poly);
@@ -162,6 +229,9 @@
   function tryMoveTo(v) {
     const move = view.targets.get(v);
     if (!move) return false;
+    // Los colores hay que leerlos antes de aplicar: después ya han cambiado.
+    renderer.animateMove(move, game.pieces[move.from],
+      move.capture ? game.pieces[move.over] : undefined);
     game.applyMove(move);
 
     if (game.chain !== null) {
@@ -240,6 +310,8 @@
       view.moveEdges = move.capture
         ? [[move.from, move.over], [move.over, move.to]]
         : [[move.from, move.to]];
+      renderer.animateMove(move, game.pieces[move.from],
+        move.capture ? game.pieces[move.over] : undefined);
       game.applyMove(move);
       view.selected = move.to;
     }
@@ -272,7 +344,7 @@
 
   /* ---------- Panel ---------- */
 
-  const PLAYER_NAMES = ['jugador 1', 'jugador 2'];
+  const playerName = (p) => `jugador ${p + 1}`;
 
   function updateBanner() {
     const banner = $('turn-banner');
@@ -281,7 +353,7 @@
     banner.querySelector('.dot').style.color = color;
 
     const ai = isAI(game.turn);
-    const who = ai ? `${PLAYER_NAMES[game.turn]} (ordenador)` : PLAYER_NAMES[game.turn];
+    const who = ai ? `${playerName(game.turn)} (ordenador)` : playerName(game.turn);
     let text;
     if (game.result) text = 'Partida terminada';
     else if (paused && ai) text = `En pausa · turno del ${who}`;
@@ -293,14 +365,12 @@
   }
 
   function syncPanel() {
-    const names = PLAYER_NAMES;
-    const alive = [game.piecesOf(0).length, game.piecesOf(1).length];
-
     document.querySelectorAll('.player').forEach((el) => {
       const p = Number(el.dataset.player);
+      const alive = game.piecesOf(p).length;
       el.classList.toggle('active', !game.result && game.turn === p);
-      el.classList.toggle('out', alive[p] === 0);
-      el.querySelector('.alive').textContent = alive[p];
+      el.classList.toggle('out', game.eliminated[p]);
+      el.querySelector('.alive').textContent = alive;
       el.querySelector('.eaten').textContent = game.captured[p];
     });
 
@@ -313,7 +383,7 @@
     endBtn.classList.toggle('pulse', canStop);
 
     const pauseBtn = $('btn-pause');
-    pauseBtn.classList.toggle('hidden', !bothAI() || !!game.result);
+    pauseBtn.classList.toggle('hidden', !allAI() || !!game.result);
     pauseBtn.textContent = paused ? 'Reanudar' : 'Pausar';
 
     $('btn-undo').disabled = game.history.length === 0;
@@ -351,15 +421,22 @@
   function showResult() {
     const { winner, reason } = game.result;
     const overlay = $('result-overlay');
+    const detalles = {
+      'sin-fichas': game.playerCount > 2
+        ? 'Es el último que queda con fichas.'
+        : 'El rival se ha quedado sin fichas.',
+      'bloqueado': 'El rival no tiene ningún movimiento legal.',
+      'puntos': `Ha comido ${game.captured[winner]} fichas, más que nadie.`,
+      'tablas': `${game.options.drawPlies} jugadas sin comer ninguna ficha.`,
+      'bloqueo-general': 'Nadie puede mover.',
+      'empate-a-puntos': 'Empate a fichas comidas.',
+    };
     if (winner === null) {
       $('result-title').textContent = 'Tablas';
-      $('result-detail').textContent =
-        `${game.options.drawPlies} jugadas sin comer ninguna ficha.`;
+      $('result-detail').textContent = detalles[reason] || '';
     } else {
       $('result-title').textContent = `¡Gana el jugador ${winner + 1}!`;
-      $('result-detail').textContent = reason === 'sin-fichas'
-        ? 'El rival se ha quedado sin fichas.'
-        : 'El rival no tiene ningún movimiento legal.';
+      $('result-detail').textContent = detalles[reason] || '';
     }
     overlay.classList.remove('hidden');
   }
@@ -491,7 +568,7 @@
   $('btn-undo').addEventListener('click', () => {
     cancelAI();
     if (!game.undo()) return;
-    if (bothAI()) {
+    if (allAI()) {
       paused = true;
     } else {
       let guard = 0;
@@ -510,22 +587,24 @@
     needsRender = true;
   });
 
-  for (const p of [0, 1]) {
-    const sel = $(`sel-p${p}`);
-    sel.value = settings.players[p];
-    sel.addEventListener('change', () => {
-      settings.players[p] = sel.value;
-      paused = false;
-      clearSelection();
-      syncPanel();
-      needsRender = true;
-      scheduleAI();
-    });
-  }
-
   $('sel-level').value = settings.level;
   $('sel-level').addEventListener('change', (e) => {
     settings.level = e.target.value;
+  });
+
+  $('sel-count').value = String(settings.playerCount);
+  $('sel-count').addEventListener('change', (e) => {
+    settings.playerCount = Number(e.target.value);
+    buildPlayerControls();
+    buildBoardOptions();
+    updatePolyDescription();
+    newGame(true);
+  });
+
+  $('sel-victory').value = settings.victory;
+  $('sel-victory').addEventListener('change', (e) => {
+    settings.victory = e.target.value;
+    newGame(true);
   });
 
   /* El poliedro se puede fijar en la URL: index.html#icosahedron */
@@ -539,20 +618,38 @@
     ...BOARD_ORDER.filter((id) => POLYHEDRA[id]),
     ...Object.keys(POLYHEDRA).filter((id) => !BOARD_ORDER.includes(id)),
   ];
-  for (const id of ordered) {
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = POLYHEDRA[id].name;
-    selPoly.appendChild(opt);
+
+  /* El desplegable solo ofrece los tableros donde caben los jugadores que hay:
+     con tres o cuatro ejércitos, los tableros pequeños no dejan sitio para
+     maniobrar. Si el actual deja de valer, se pasa al mejor que sí valga. */
+  function buildBoardOptions() {
+    const usable = ordered.filter((id) =>
+      boardSupportsPlayers(POLYHEDRA[id], settings.playerCount)
+    );
+    selPoly.innerHTML = '';
+    for (const id of usable) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = POLYHEDRA[id].name;
+      selPoly.appendChild(opt);
+    }
+    if (!usable.includes(settings.polyId)) {
+      // En móvil, el sustituto también tiene que verse bien.
+      settings.polyId = defaultBoardId(isSmallScreen, usable);
+      applyBoardPreset(settings.polyId);
+    }
+    selPoly.value = settings.polyId;
+    return usable.length;
   }
+
   settings.polyId = polyFromHash() || settings.polyId;
-  selPoly.value = settings.polyId;
 
   function updatePolyDescription() {
     const poly = POLYHEDRA[settings.polyId];
-    const big = settings.homeSize === 2 && poly.piecesPerPlayerBig;
-    const fichas = big ? poly.piecesPerPlayerBig : poly.piecesPerPlayer;
-    const libres = poly.vertices.length - 2 * fichas;
+    const home = boardHomes(poly, settings.playerCount, settings.homeSize);
+    const fichas = home ? home.sets[0].length : poly.piecesPerPlayer;
+    const bandos = home ? home.sets.length : 2;
+    const libres = poly.vertices.length - fichas * bandos;
     $('poly-desc').textContent =
       `${poly.description} ${fichas} fichas por jugador y ${libres} vértices libres.`;
   }
@@ -663,6 +760,8 @@
     requestAnimationFrame(loop);
   }
 
+  buildPlayerControls();
+  buildBoardOptions();
   applyBoardPreset(settings.polyId);
   newGame(false);
   requestAnimationFrame(loop);
@@ -673,6 +772,8 @@
     get renderer() { return renderer; },
     view,
     settings,
+    boards: POLYHEDRA,
+    defaultBoardId,
     refresh() { syncPanel(); needsRender = true; },
     newGame,
   };

@@ -35,22 +35,8 @@
       <p class="subtitle">Damas sobre los vértices de un poliedro o un grafo</p>
     </header>
 
-    <section class="players">
-      <div class="player" data-player="0">
-        <span class="chip"></span>
-        <div class="info">
-          <strong>Jugador 1</strong>
-          <span class="stats"><span class="alive">5</span> fichas · <span class="eaten">0</span> comidas</span>
-        </div>
-      </div>
-      <div class="player" data-player="1">
-        <span class="chip"></span>
-        <div class="info">
-          <strong>Jugador 2</strong>
-          <span class="stats"><span class="alive">5</span> fichas · <span class="eaten">0</span> comidas</span>
-        </div>
-      </div>
-    </section>
+    <!-- Un marcador por jugador; se generan según cuántos jueguen. -->
+    <section class="players" id="players"></section>
 
     <nav id="tabs" aria-label="Secciones del panel">
       <button class="tab active" data-tab="partida">Partida</button>
@@ -72,17 +58,20 @@
     <section class="settings pane active" data-pane="partida">
       <h2>Jugadores</h2>
       <label class="field">
-        <span>Jugador 1 (cian)</span>
-        <select id="sel-p0">
-          <option value="human">Humano</option>
-          <option value="ai">Ordenador</option>
+        <span>Cuántos juegan</span>
+        <select id="sel-count">
+          <option value="2">2 jugadores</option>
+          <option value="3">3 jugadores</option>
+          <option value="4">4 jugadores</option>
         </select>
       </label>
-      <label class="field">
-        <span>Jugador 2 (naranja)</span>
-        <select id="sel-p1">
-          <option value="human">Humano</option>
-          <option value="ai">Ordenador</option>
+      <!-- Un selector Humano/Ordenador por bando; se generan según cuántos. -->
+      <div id="player-roles"></div>
+      <label class="field" id="fld-victory">
+        <span>Cómo se gana</span>
+        <select id="sel-victory">
+          <option value="points">Quien más fichas coma</option>
+          <option value="elimination">El último que quede en pie</option>
         </select>
       </label>
       <label class="field" id="fld-level">
@@ -144,7 +133,8 @@
         <li>Las fichas ocupan <strong>vértices</strong> y se mueven por las aristas a un vértice vecino vacío.</li>
         <li>Para <strong>comer</strong>, salta sobre una ficha rival vecina y cae en cualquier vértice vacío contiguo a ella. El salto no tiene que ser recto.</li>
         <li>Cada jugador empieza en una <strong>cara</strong> del sólido y el rival en la <strong>opuesta</strong>. En los tableros que son solo un grafo, cada uno sale de la <strong>zona</strong> alrededor de su polo.</li>
-        <li>Pierde quien se quede <strong>sin fichas</strong> o <strong>sin movimientos</strong>.</li>
+        <li>A dos jugadores, pierde quien se quede <strong>sin fichas</strong> o <strong>sin movimientos</strong>.</li>
+        <li>A tres o cuatro, todos son rivales de todos: quien se queda sin fichas queda <strong>eliminado</strong>, y quien no puede mover simplemente <strong>pasa turno</strong>.</li>
       </ul>
     </section>
 

@@ -50,6 +50,26 @@ const BOARD_ORDER = [
   'truncatedIcosidodecahedron',
 ];
 
+/* Tablero de salida. En una pantalla de móvil un sólido de 60 o 120 vértices
+   sale diminuto y con las fichas amontonadas, así que ahí se arranca con el
+   mejor tablero que no pase de este tamaño. En escritorio no se toca nada. */
+const DEFAULT_BOARD = 'dodecahedron';
+const MOBILE_MAX_VERTICES = 30;
+
+/* Devuelve el tablero con el que arrancar. `candidates` permite restringir la
+   elección (por ejemplo, a los que admiten cuatro jugadores). */
+function defaultBoardId(smallScreen, candidates) {
+  const list = candidates && candidates.length ? candidates : BOARD_ORDER;
+  const preferred = list.includes(DEFAULT_BOARD) ? DEFAULT_BOARD : list[0];
+  if (!smallScreen) return preferred;
+
+  const fits = (id) =>
+    POLYHEDRA[id] && POLYHEDRA[id].vertices.length <= MOBILE_MAX_VERTICES;
+  if (fits(preferred)) return preferred;
+  // La lista va de mejor a peor, así que el primero que quepa es el mejor.
+  return list.find(fits) || preferred;
+}
+
 const DEFAULT_PRESET = {
   homeSize: 2,
   multiJump: false,

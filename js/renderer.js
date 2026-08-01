@@ -8,8 +8,10 @@
    justo el que hace falta para que la profundidad se aprecie bien. */
 
 const PLAYER_COLORS = [
-  { base: '#4fc3f7', light: '#b3e9ff', dark: '#0d5b7d', name: 'Cian' },
-  { base: '#ff8a65', light: '#ffd0bd', dark: '#8a3212', name: 'Naranja' },
+  { base: '#4fc3f7', light: '#b3e9ff', dark: '#0d5b7d', name: 'cian' },
+  { base: '#ff8a65', light: '#ffd0bd', dark: '#8a3212', name: 'naranja' },
+  { base: '#a5d66b', light: '#ddf5b8', dark: '#41651c', name: 'verde' },
+  { base: '#c79bf0', light: '#ecd9ff', dark: '#513072', name: 'violeta' },
 ];
 
 class Renderer {
@@ -110,9 +112,39 @@ class Renderer {
     this.animT = 0;
   }
 
+  /* Anima una ficha desplazándose de un vértice a otro, y la desaparición de
+     la que se come. Sin esto las fichas se teletransportan y con el ordenador
+     jugando es muy difícil seguir la partida. */
+  animateMove(move, mover, eaten) {
+    this.moveAnim = {
+      from: move.from,
+      to: move.to,
+      over: move.capture ? move.over : null,
+      mover,          // color de la ficha que se mueve
+      eaten,          // color de la que se come, para desvanecerla
+      t: 0,
+    };
+  }
+
+  /* Posición interpolada de la ficha en movimiento, o null. */
+  movingPiece() {
+    const a = this.moveAnim;
+    if (!a || a.t >= 1) return null;
+    // Suavizado en los extremos para que arranque y frene.
+    const t = a.t < 0.5 ? 2 * a.t * a.t : 1 - ((-2 * a.t + 2) ** 2) / 2;
+    const p = V.lerp(this.poly.vertices[a.from], this.poly.vertices[a.to], t);
+    // Un poco de arco hacia fuera: se lee mejor sobre las caras del sólido.
+    return V.scale(p, 1 + 0.10 * Math.sin(Math.PI * t));
+  }
+
   /* Devuelve true si sigue animando (y hay que pedir otro frame). */
   step(dt) {
-    if (this.animT >= 1 || !this.animTo) return false;
+    let busy = false;
+    if (this.moveAnim && this.moveAnim.t < 1) {
+      this.moveAnim.t = Math.min(1, this.moveAnim.t + dt / 260);
+      busy = true;
+    }
+    if (this.animT >= 1 || !this.animTo) return busy;
     this.animT = Math.min(1, this.animT + dt / 550);
     const t = this.animT;
     const eased = t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
@@ -201,6 +233,16 @@ class Renderer {
       items.push({ depth: pts[i].depth, draw: () => this.drawVertex(ctx, pts[i], i, game, view) });
     }
 
+    // La ficha que se está moviendo va aparte: no está en ningún vértice.
+    const moving = this.movingPiece();
+    if (moving) {
+      const mp = this.project(moving);
+      items.push({
+        depth: mp.depth,
+        draw: () => this.drawPiece(ctx, mp, this.moveAnim.mover, 1),
+      });
+    }
+
     items.sort((a, b) => b.depth - a.depth);
     for (const item of items) item.draw();
 
@@ -268,7 +310,18 @@ class Renderer {
   }
 
   drawVertex(ctx, p, index, game, view) {
-    const owner = game.pieces[index];
+    let owner = game.pieces[index];
+
+    /* Mientras dura la animación la ficha ya está en el destino según las
+       reglas, pero en pantalla todavía va por el aire: aquí no se pinta. */
+    const anim = this.moveAnim;
+    if (anim && anim.t < 1) {
+      if (index === anim.to) return;
+      if (index === anim.over && anim.eaten !== undefined) {
+        this.drawPiece(ctx, p, anim.eaten, 1 - anim.t);
+        return;
+      }
+    }
     const r = this.pieceRadius(p);
     // Cuanto más lejos, más apagado: es lo que da sensación de profundidad.
     const fade = 0.4 + this.nearness(p.depth) * 0.6;
@@ -323,8 +376,14 @@ class Renderer {
       return;
     }
 
-    // Ficha: esfera falsa con un degradado desplazado hacia la luz.
-    const c = PLAYER_COLORS[owner];
+    this.drawPiece(ctx, p, owner, 1, view.hover === index);
+  }
+
+  /* Ficha: esfera falsa con un degradado desplazado hacia la luz. */
+  drawPiece(ctx, p, owner, opacity, highlight) {
+    const r = this.pieceRadius(p);
+    const fade = (0.4 + this.nearness(p.depth) * 0.6) * opacity;
+    const c = PLAYER_COLORS[owner % PLAYER_COLORS.length];
     const g = ctx.createRadialGradient(
       p.x - r * 0.35, p.y - r * 0.4, r * 0.12,
       p.x, p.y, r
@@ -333,13 +392,13 @@ class Renderer {
     g.addColorStop(0.55, c.base);
     g.addColorStop(1, c.dark);
 
-    ctx.globalAlpha = fade;
+    ctx.globalAlpha = Math.max(0, Math.min(1, fade));
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fillStyle = g;
     ctx.fill();
-    ctx.lineWidth = view.hover === index ? 2 : 1;
-    ctx.strokeStyle = view.hover === index
+    ctx.lineWidth = highlight ? 2 : 1;
+    ctx.strokeStyle = highlight
       ? 'rgba(255, 255, 255, 0.85)'
       : 'rgba(0, 0, 0, 0.35)';
     ctx.stroke();

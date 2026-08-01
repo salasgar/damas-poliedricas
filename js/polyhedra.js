@@ -174,6 +174,64 @@ function homesByDistance(vertices, neighbors, fraction) {
   return { sets, faces: [[], []], dirs };
 }
 
+/* Reparto para más de dos jugadores.
+
+   Se eligen `playerCount` polos por dispersión voraz: el primero es el extremo
+   de un diámetro y cada siguiente es el vértice que maximiza la distancia
+   mínima a los ya elegidos. Después cada vértice se asigna al polo que tenga
+   más cerca, y de cada zona se toman los más próximos a su polo, recortando
+   todos los ejércitos al mismo tamaño para que nadie salga con ventaja.
+
+   `occupancy` es la fracción del tablero ocupada entre todos. */
+function homesByPoles(vertices, neighbors, playerCount, occupancy) {
+  const n = vertices.length;
+
+  // Primer polo: un extremo del diámetro, como en el reparto de dos.
+  const first = bfsDistances(neighbors, 0);
+  const poles = [first.indexOf(Math.max(...first.filter((d) => d < Infinity)))];
+  const dists = [bfsDistances(neighbors, poles[0])];
+
+  while (poles.length < playerCount) {
+    let best = -1;
+    let bestDist = -1;
+    for (let v = 0; v < n; v++) {
+      const d = Math.min(...dists.map((dd) => dd[v]));
+      if (d > bestDist) {
+        bestDist = d;
+        best = v;
+      }
+    }
+    poles.push(best);
+    dists.push(bfsDistances(neighbors, best));
+  }
+
+  // Cada vértice va al polo más cercano; empata el de menor índice.
+  const zones = poles.map(() => []);
+  for (let v = 0; v < n; v++) {
+    let owner = 0;
+    for (let i = 1; i < playerCount; i++) {
+      if (dists[i][v] < dists[owner][v]) owner = i;
+    }
+    zones[owner].push(v);
+  }
+  zones.forEach((z, i) => z.sort((a, b) => dists[i][a] - dists[i][b] || a - b));
+
+  /* Todos los ejércitos del mismo tamaño: lo limita la zona más pequeña, la
+     ocupación pedida y la necesidad de dejar huecos libres donde moverse. */
+  const k = Math.min(
+    Math.floor((n * occupancy) / playerCount),
+    Math.floor((n - 2) / playerCount),
+    ...zones.map((z) => z.length)
+  );
+  if (k < 2) return null; // el tablero no da para tantos jugadores
+
+  const sets = zones.map((z) => z.slice(0, k));
+  const dirs = sets.map((set) =>
+    V.norm(set.reduce((acc, i) => V.add(acc, vertices[i]), [0, 0, 0]))
+  );
+  return { sets, faces: sets.map(() => []), dirs };
+}
+
 function buildPolyhedron(def) {
   // Normalizamos el tamaño para que todos los tableros se vean igual de grandes.
   const radius = Math.max(...def.vertices.map(V.len));
@@ -514,6 +572,46 @@ const POLYHEDRA_DEFS = [
     vertices: antiprism(9),
   },
 ];
+
+/* --- Reparto según el número de jugadores -------------------------------- */
+
+/* Fracción del tablero ocupada entre todos, según el tamaño de ejército. */
+const OCCUPANCY = { 1: 0.5, 2: 0.68 };
+
+/* Con menos vértices que esto, tres o cuatro ejércitos no dejan sitio para
+   maniobrar y la partida se decide por asfixia antes de empezar. */
+const MIN_VERTICES_MULTI = 24;
+
+const homesCache = new Map();
+
+/* Reparto de `board` para `playerCount` jugadores y ejércitos de tamaño
+   `homeSize`. Con dos jugadores se conserva el reparto original (caras
+   opuestas en los sólidos, polos opuestos en los grafos); con más, se reparte
+   por zonas alrededor de polos dispersos. Devuelve null si no cabe. */
+function boardHomes(board, playerCount, homeSize) {
+  if (playerCount === 2) return board.homes[homeSize] || board.homes[1];
+  if (board.vertices.length < MIN_VERTICES_MULTI) return null;
+
+  const key = `${board.id}:${playerCount}:${homeSize}`;
+  if (!homesCache.has(key)) {
+    homesCache.set(
+      key,
+      homesByPoles(
+        board.vertices,
+        board.neighbors,
+        playerCount,
+        OCCUPANCY[homeSize] || OCCUPANCY[1]
+      )
+    );
+  }
+  return homesCache.get(key);
+}
+
+/* ¿Admite este tablero una partida de `playerCount` jugadores? */
+function boardSupportsPlayers(board, playerCount) {
+  if (playerCount === 2) return true;
+  return [1, 2].some((size) => boardHomes(board, playerCount, size));
+}
 
 const POLYHEDRA = {};
 for (const def of POLYHEDRA_DEFS) {
