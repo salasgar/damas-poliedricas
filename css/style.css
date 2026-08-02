@@ -160,6 +160,10 @@ html, body {
 .player .info { display: flex; flex-direction: column; color: var(--text); }
 .player strong { font-size: 14px; }
 .player .stats { font-size: 12px; color: var(--muted); }
+/* Marcador de invasión: es lo que decide la partida, así que se destaca del
+   recuento de fichas. El color del bando lo pone el guion, porque `.info` ya ha
+   roto la herencia de color que traía `.player`. */
+.player .score { font-weight: 600; }
 
 /* ---------- Controles ---------- */
 

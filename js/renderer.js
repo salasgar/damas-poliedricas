@@ -273,13 +273,43 @@ class Renderer {
 
     // Las caras de salida llevan el color de su dueño.
     const home = game.homeFaceSets.findIndex((set) => set.includes(faceIndex));
+    const invasion = game.options.victory === 'invasion';
     if (home >= 0) {
       const c = PLAYER_COLORS[home];
       color = hexToRgb(c.base);
-      alpha = 0.07 + facing * 0.13;
+      // Jugando a invadir, el territorio es el objetivo: se tiñe más fuerte.
+      alpha = invasion ? 0.12 + facing * 0.2 : 0.07 + facing * 0.13;
     }
 
     ctx.fillStyle = `rgba(${color}, ${alpha})`;
+    ctx.fill();
+
+    // Y lleva un emblema en el centro, para reconocerlo de un vistazo.
+    if (home >= 0 && invasion && facingZ > 0.05) {
+      this.drawHomeEmblem(ctx, fp, PLAYER_COLORS[home], facingZ);
+    }
+  }
+
+  /* Diana en el centro de una cara de salida: es lo que hay que invadir. */
+  drawHomeEmblem(ctx, fp, color, facingZ) {
+    const cx = fp.reduce((a, p) => a + p.x, 0) / fp.length;
+    const cy = fp.reduce((a, p) => a + p.y, 0) / fp.length;
+    // Menos de un tercio del radio de la cara: no debe competir con las fichas.
+    const r = Math.min(...fp.map((p) => Math.hypot(p.x - cx, p.y - cy))) * 0.3;
+    if (r < 3) return;
+
+    /* La opacidad sigue a lo de frente que esté la cara, no a la profundidad:
+       en una cara vista casi de canto el emblema sale deformado y muy pequeño,
+       así que ahí conviene que casi no se vea. */
+    const alpha = 0.12 + facingZ * 0.5;
+    ctx.strokeStyle = `rgba(${hexToRgb(color.light)}, ${alpha})`;
+    ctx.lineWidth = Math.max(1, r * 0.16);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.34, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${hexToRgb(color.light)}, ${alpha})`;
     ctx.fill();
   }
 
@@ -311,6 +341,31 @@ class Renderer {
 
   drawVertex(ctx, p, index, game, view) {
     let owner = game.pieces[index];
+    const r = this.pieceRadius(p);
+    // Cuanto más lejos, más apagado: es lo que da sensación de profundidad.
+    const fade = 0.4 + this.nearness(p.depth) * 0.6;
+
+    /* Territorio: al jugar a invadir, cada vértice de un campo de salida lleva
+       un anillo del color de su dueño. Es la única marca que sirve en todos los
+       tableros, porque los que son solo un grafo no tienen caras que teñir. El
+       anillo se cierra y se enciende cuando lo ocupa un invasor. Se pinta antes
+       que nada: el territorio no se mueve, así que también está bajo la ficha
+       que en ese momento va por el aire. */
+    if (game.options.victory === 'invasion') {
+      const territory = game.homeOwner[index];
+      if (territory !== EMPTY) {
+        const invaded = owner !== EMPTY && owner !== territory;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 1.32, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${hexToRgb(PLAYER_COLORS[territory].light)}, ${
+          (invaded ? 0.95 : 0.4) * fade
+        })`;
+        ctx.lineWidth = invaded ? 2.4 : 1.4;
+        if (!invaded) ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
 
     /* Mientras dura la animación la ficha ya está en el destino según las
        reglas, pero en pantalla todavía va por el aire: aquí no se pinta. */
@@ -322,9 +377,6 @@ class Renderer {
         return;
       }
     }
-    const r = this.pieceRadius(p);
-    // Cuanto más lejos, más apagado: es lo que da sensación de profundidad.
-    const fade = 0.4 + this.nearness(p.depth) * 0.6;
 
     // Marcas de destino y selección, por debajo de la ficha.
     const target = view.targets && view.targets.get(index);

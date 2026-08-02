@@ -17,7 +17,8 @@
     playerCount: 2,
     /* Con tres o cuatro bandos, eliminar a todos los rivales es tan difícil que
        casi todas las partidas acababan en tablas; por puntos quedan repartidas.
-       Con dos jugadores esta opción no se usa. */
+       Con dos también viene de serie: es lo que cierra los finales en los que
+       ambos ejércitos se esquivan hasta agotar el límite sin capturas. */
     victory: 'points',
     /* 'human' u 'ai' para cada bando. */
     players: ['human', 'ai', 'ai', 'ai'],
@@ -63,7 +64,10 @@
         '<span class="chip"></span><div class="info">' +
         `<strong>Jugador ${p + 1}</strong>` +
         '<span class="stats"><span class="alive">0</span> fichas · ' +
-        '<span class="eaten">0</span> comidas</span></div>';
+        '<span class="eaten">0</span> comidas</span>' +
+        `<span class="stats score hidden" style="color:${PLAYER_COLORS[p].base}">` +
+        '<span class="points">0</span>/<span class="goal">0</span>' +
+        ' puntos de invasión</span></div>';
       marks.appendChild(el);
     }
 
@@ -89,8 +93,32 @@
       });
     }
 
-    // Ganar por puntos solo tiene sentido con más de dos bandos.
-    $('fld-victory').classList.toggle('hidden', n === 2);
+    syncVictoryNote();
+  }
+
+  /* A dos jugadores la regla por puntos no cambia cómo se gana sobre el
+     tablero —sigue perdiendo quien se queda sin fichas o sin movimientos—,
+     solo quién se lleva la partida cuando se agota el límite sin capturas. El
+     nombre del desplegable no lo dice, así que lo explica la nota. */
+  function syncVictoryNote() {
+    const limite = `${DEFAULT_OPTIONS.drawPlies} jugadas sin comer`;
+    const dos = settings.playerCount === 2;
+    // Sin texto para un modo que esta nota no conozca, antes que uno erróneo.
+    let texto = '';
+    if (settings.victory === 'points') {
+      texto = dos
+        ? `Tras ${limite}, gana quien más fichas haya comido; solo hay tablas si van iguales. Así los finales no se atascan en esquivarse.`
+        : 'Gana quien más fichas haya comido al acabar la partida, aunque le hayan eliminado antes.';
+    } else if (settings.victory === 'elimination') {
+      texto = dos
+        ? `Tras ${limite}, la partida es tablas.`
+        : `Gana el último que conserve fichas; tras ${limite}, tablas.`;
+    } else if (settings.victory === 'invasion') {
+      texto =
+        'Cada jugada que acaba en el campo de un rival vale un punto; gana quien ' +
+        'consiga tantos puntos como vértices tiene ese campo.';
+    }
+    $('victory-note').textContent = texto;
   }
 
   /* Vuelca `settings` en los controles del panel. */
@@ -372,6 +400,12 @@
       el.classList.toggle('out', game.eliminated[p]);
       el.querySelector('.alive').textContent = alive;
       el.querySelector('.eaten').textContent = game.captured[p];
+
+      // Marcador de invasión: solo cuando es lo que decide la partida.
+      const score = el.querySelector('.score');
+      score.classList.toggle('hidden', settings.victory !== 'invasion');
+      el.querySelector('.points').textContent = game.points[p];
+      el.querySelector('.goal').textContent = game.pointTarget[p];
     });
 
     updateBanner();
@@ -426,10 +460,26 @@
         ? 'Es el último que queda con fichas.'
         : 'El rival se ha quedado sin fichas.',
       'bloqueado': 'El rival no tiene ningún movimiento legal.',
-      'puntos': `Ha comido ${game.captured[winner]} fichas, más que nadie.`,
+      /* A dos jugadores, «puntos» solo sale del límite sin capturas: ahí la
+         cuenta atrás es la mitad de la explicación. */
+      'puntos': game.playerCount > 2
+        ? `Ha comido ${game.captured[winner]} fichas, más que nadie.`
+        : `${game.options.drawPlies} jugadas sin comer: gana por fichas comidas, ` +
+          `${game.captured[winner]} a ${game.captured[1 - winner]}.`,
+      'invasion': winner === null ? '' :
+        `Ha pisado ${game.points[winner]} veces el campo contrario, tantas como ` +
+        'vértices tiene.',
+      'invasion-puntos': winner === null ? '' :
+        `${game.options.drawPlies} jugadas sin comer ni invadir: gana por puntos ` +
+        `de invasión, ${game.points[winner]} a ${game.points.filter((_, p) => p !== winner).join(' y ')}.`,
+      'ultimo-bocado':
+        `${game.options.drawPlies} jugadas sin comer, y todo empatado: ` +
+        'gana por haber dado el último bocado.',
       'tablas': `${game.options.drawPlies} jugadas sin comer ninguna ficha.`,
       'bloqueo-general': 'Nadie puede mover.',
-      'empate-a-puntos': 'Empate a fichas comidas.',
+      'empate-a-puntos': settings.victory === 'invasion'
+        ? 'Empate a puntos de invasión, a fichas comidas y a fichas en el tablero.'
+        : 'Empate a fichas comidas y a fichas en el tablero.',
     };
     if (winner === null) {
       $('result-title').textContent = 'Tablas';
@@ -604,6 +654,7 @@
   $('sel-victory').value = settings.victory;
   $('sel-victory').addEventListener('change', (e) => {
     settings.victory = e.target.value;
+    syncVictoryNote();
     newGame(true);
   });
 

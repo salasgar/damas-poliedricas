@@ -20,8 +20,37 @@ navegador y ya está.
   dos caras contiguas), y el rival en las **caras opuestas**. Como el reparto es
   por caras opuestas, siempre son 2 jugadores.
 - **Final.** A dos jugadores, pierde quien se quede sin fichas o sin movimientos
-  legales. Si pasan 60 semimovimientos sin comer nada, tablas. A tres o cuatro,
-  ver más abajo.
+  legales. Si pasan 60 semimovimientos sin comer nada la partida se cierra ahí:
+  con el ajuste por defecto («quien más fichas coma») gana el que va por delante
+  en el marcador, y solo hay tablas si van iguales. A tres o cuatro, ver más
+  abajo. Y hay un tercer objetivo posible, **invadir el campo contrario**, que
+  cambia a qué se juega: ver el apartado siguiente.
+
+### Invadir el campo contrario
+
+Modo de juego alternativo, en el desplegable **Cómo se gana**. Cambia el objetivo
+sin tocar el movimiento ni la captura:
+
+- Los vértices de salida de cada bando son su **territorio** y lo siguen siendo
+  toda la partida, aunque sus fichas los abandonen. Se ven marcados con el color
+  de su dueño: la cara teñida y con una diana en el centro en los sólidos, y un
+  anillo alrededor de cada vértice en todos los tableros, incluidos los que no
+  tienen caras.
+- **Cada jugada que termina en un vértice del territorio de un rival vale un
+  punto**, se haya llegado andando o saltando, y también en cada salto intermedio
+  de una captura encadenada.
+- Gana el primero que reúne **tantos puntos como vértices tiene ese territorio**.
+  Con tres o cuatro bandos todos los territorios son del mismo tamaño y vale
+  invadir el de cualquiera, así que la meta es la misma para todos.
+- **Comer deja de ser el objetivo y pasa a ser el medio**: sirve para abrirse
+  paso y para desalojar al que te está invadiendo, pero no da puntos. Solo
+  desempata al agotarse el límite de jugadas muertas, por detrás de los puntos de
+  invasión.
+- Quedarse sin fichas o sin movimientos legales sigue perdiendo la partida: sin
+  fichas no se invade nada.
+
+El contador de jugadas muertas también se pone a cero al conseguir un punto, así
+que pisar el campo rival cuenta como progreso aunque no se coma nada.
 
 ### Reglas opcionales
 
@@ -66,7 +95,9 @@ Hay dos diferencias de reglas respecto al duelo:
 | Toro 6×6 | 2/0/10 · 0 tablas | 2/2/3/4 · 1 tabla |
 
   (victorias por bando, 12 partidas cada casilla; con eliminación todas esas
-  casillas serían «0/0/0 · 12 tablas»).
+  casillas serían «0/0/0 · 12 tablas»). Las tablas que quedan en la tabla se
+  midieron antes de añadir el desempate por «último bocado»; hoy casi todas
+  ellas se resolverían (ver más abajo).
 
   Puntuar por fichas comidas también suaviza el **kingmaking**: si te eliminan
   pronto tu marcador sigue contando, así que no te da igual a quién ayudas por
@@ -282,6 +313,23 @@ condiciones, que son las que se comprueban en el análisis:
 - no se come casi nada (menos de 1 captura por partida),
 - sale siempre la misma partida.
 
+### Invadir acorta las partidas y casi no deja tablas
+
+Los tres objetivos, sobre los doce primeros tableros del desplegable con su
+preajuste, tres semillas cada uno y nivel Fácil por coste de cálculo:
+
+| Objetivo | 2 jugadores | 3 jugadores | 4 jugadores |
+| --- | --- | --- | --- |
+| Invadir el campo contrario | 26/36 decisivas · 47 semijugadas | 27/27 · 29 | 27/27 · 24 |
+| Quien más fichas coma | 22/36 decisivas · 75 semijugadas | 27/27 · 147 | 26/27 · 165 |
+| El último que quede en pie | 1/36 decisivas · 78 semijugadas | 1/27 · 150 | 0/27 · 151 |
+
+Era de esperar y es justo lo que se buscaba: con un objetivo que se puede
+perseguir directamente, la partida no depende de que el rival se descuide. A
+tres y cuatro bandos la diferencia es mayor todavía —de unas 150 semijugadas a
+menos de 30—, porque nadie puede esperar a que los demás se desgasten entre
+ellos mientras el más rápido corre hacia un campo desguarnecido.
+
 ### Jugabilidad de cada tablero
 
 Cada tablero con su mejor configuración, ordenados por calidad de juego.
@@ -344,6 +392,39 @@ opuesto:
 
 Por eso el preajuste de casi todos los tableros los desactiva. Solo el
 dodecaedro y el octaedro truncado los aguantan, y aun así rinden mejor sin ellos.
+
+### El reloj, contra la parálisis del final
+
+La parálisis no es un defecto de un tablero concreto, es la geometría del juego:
+para comerte hace falta estar a tu lado y que te quede un hueco libre al lado,
+así que **el que se acerca es el que ofrece el primer salto**. Cuando quedan
+pocas fichas y sobra sitio, a los dos les compensa esperar y la partida moría en
+el límite de 60 semimovimientos sin comer.
+
+Ahora ese límite no declara tablas: **cierra la partida a favor de quien va por
+delante**, con la regla «quien más fichas coma» (la de serie, también a dos
+jugadores). El orden de desempate es fichas comidas → fichas conservadas → **quien
+dio el último bocado**. El tercero no es decorativo: dos ordenadores del mismo
+nivel sobre un tablero simétrico se copian y llegan al límite empatados en todo,
+así que sin él la partida seguía siendo tablas, solo que con otro nombre. Con él,
+en todo momento hay exactamente un bando que está perdiendo el reloj y que, si no
+hace nada, pierde.
+
+Medido en el dodecaedro con ejércitos grandes, ordenador contra ordenador:
+
+| Nivel | Con «el último en pie» | Con «quien más fichas coma» |
+| --- | --- | --- |
+| Difícil (8 partidas) | 8 tablas | 0 tablas (8 al último bocado) |
+| Normal (16 partidas) | 16 tablas | 0 tablas (5 por fichas, 11 al último bocado) |
+| Difícil, con saltos múltiples (6) | 6 tablas | 0 tablas (6 por eliminación) |
+| Grafo de Petersen, normal (8) | 8 tablas | 0 tablas |
+
+**Lo que el reloj no arregla.** Las capturas por partida no suben (10,0 antes y
+10,0 después): la partida se decide, pero el bando que va por detrás sigue sin
+tener ninguna forma de atacar que no le cueste una ficha, así que los últimos 30
+movimientos siguen siendo de esquiva. Para que además haya juego hace falta una
+regla que premie avanzar —la de **invasión**— o una que devuelva densidad al
+tablero encogiéndolo.
 
 ### Los cuatro tableros que no se salvan
 

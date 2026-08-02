@@ -72,8 +72,10 @@
         <select id="sel-victory">
           <option value="points">Quien más fichas coma</option>
           <option value="elimination">El último que quede en pie</option>
+          <option value="invasion">Quien invada el campo contrario</option>
         </select>
       </label>
+      <p id="victory-note" class="note"></p>
       <label class="field" id="fld-level">
         <span>Nivel del ordenador</span>
         <select id="sel-level">
@@ -135,6 +137,8 @@
         <li>Cada jugador empieza en una <strong>cara</strong> del sólido y el rival en la <strong>opuesta</strong>. En los tableros que son solo un grafo, cada uno sale de la <strong>zona</strong> alrededor de su polo.</li>
         <li>A dos jugadores, pierde quien se quede <strong>sin fichas</strong> o <strong>sin movimientos</strong>.</li>
         <li>A tres o cuatro, todos son rivales de todos: quien se queda sin fichas queda <strong>eliminado</strong>, y quien no puede mover simplemente <strong>pasa turno</strong>.</li>
+        <li>Jugando a <strong>invadir el campo contrario</strong>, cada jugada que termina en un vértice del <strong>territorio</strong> de un rival —el de salida, marcado con su color— vale un <strong>punto</strong>, se llegue andando o saltando. Gana quien reúna tantos puntos como vértices tiene ese territorio. Comer deja de ser el objetivo: es el modo de abrirse paso.</li>
+        <li>Si pasan muchas jugadas <strong>sin comer</strong>, la partida se cierra: gana quien más fichas haya comido, o quien más puntos de invasión lleve, o son tablas si se juega «el último que quede en pie». Sin esa cuenta atrás, en los finales con pocas fichas a nadie le compensa acercarse.</li>
       </ul>
     </section>
 

@@ -14,14 +14,41 @@
 
 const EMPTY = -1;
 
+/* Distancias en aristas desde el conjunto `sources` a todo el grafo, de una
+   sola pasada (BFS con varios orígenes a la vez). */
+function multiSourceDistances(neighbors, sources) {
+  const dist = new Array(neighbors.length).fill(Infinity);
+  const queue = [];
+  for (const s of sources) {
+    dist[s] = 0;
+    queue.push(s);
+  }
+  for (let head = 0; head < queue.length; head++) {
+    const v = queue[head];
+    for (const nb of neighbors[v]) {
+      if (dist[nb] === Infinity) {
+        dist[nb] = dist[v] + 1;
+        queue.push(nb);
+      }
+    }
+  }
+  return dist;
+}
+
 const DEFAULT_OPTIONS = {
   /* Número de bandos. Con más de dos, el reparto se hace por zonas alrededor
      de polos dispersos y el turno rota entre los que siguen en juego. */
   playerCount: 2,
-  /* Cómo se decide el ganador con más de dos jugadores:
-     'elimination' – gana el último que queda con fichas
-     'points'      – gana quien más fichas haya comido al acabar la partida,
-                     también si le eliminaron por el camino */
+  /* Cómo se decide el ganador:
+     'elimination' – gana el último que queda con fichas; si se agota el límite
+                     de jugadas sin comer, tablas
+     'points'      – gana quien más fichas haya comido, también si le eliminaron
+                     por el camino, y también cuando se agota ese límite
+     'invasion'    – gana quien invada el campo contrario: cada jugada que
+                     termina en un vértice del territorio de un rival vale un
+                     punto, y se gana al llegar a tantos puntos como vértices
+                     tiene ese territorio. Comer deja de ser el objetivo y pasa
+                     a ser el medio de abrirse paso hasta el campo enemigo. */
   victory: 'elimination',
   /* Si hay capturas disponibles, ¿obliga a hacerlas? */
   mandatoryCapture: false,
@@ -30,7 +57,11 @@ const DEFAULT_OPTIONS = {
      'optional' – se puede seguir comiendo o plantarse
      'forced'   – si se puede seguir comiendo, hay que hacerlo */
   chainCaptures: 'optional',
-  /* Semimovimientos sin comer tras los que se declaran tablas. */
+  /* Semimovimientos sin comer tras los que se cierra la partida: con la regla
+     por puntos gana el que va por delante, con la de invasión el que más campo
+     contrario haya pisado, y sin ninguna de las dos son tablas. Con la regla de
+     invasión el contador también se pone a cero al conseguir un punto: pisar el
+     campo rival es progreso aunque no se coma nada. */
   drawPlies: 60,
   /* Caras de salida por jugador: 1 (ejércitos pequeños) o 2 (grandes). */
   homeSize: 1,
@@ -61,20 +92,67 @@ class Game {
 
     this.homeFaceSets = home.faces;   // caras que se tiñen del color de cada bando
     this.homeDirections = home.dirs;  // hacia dónde mira la cámara en cada turno
+    this.homeSets = home.sets.map((set) => set.slice());
 
+    /* El territorio de cada bando son los vértices de los que sale: no se
+       mueve en toda la partida aunque las fichas lo abandonen. Con la regla de
+       invasión es el objetivo, así que hace falta poder preguntar por un
+       vértice de quién es el campo. */
+    this.homeOwner = new Array(n).fill(EMPTY);
     home.sets.forEach((set, player) => {
-      for (const v of set) this.pieces[v] = player;
+      for (const v of set) {
+        this.pieces[v] = player;
+        this.homeOwner[v] = player;
+      }
     });
+
+    /* Puntos que hay que conseguir: tantos como vértices tiene el campo
+       contrario. Con tres o cuatro bandos todos los territorios son del mismo
+       tamaño y vale invadir el de cualquiera, así que la meta es la misma. */
+    this.pointTarget = [];
+    for (let p = 0; p < this.playerCount; p++) {
+      let target = 0;
+      for (let q = 0; q < this.playerCount; q++) {
+        if (q !== p) target = Math.max(target, this.homeSets[q].length);
+      }
+      this.pointTarget.push(target);
+    }
+
+    /* Distancia en aristas de cada vértice al territorio enemigo más próximo,
+       una tabla por jugador. No cambia durante la partida y la IA la consulta
+       en cada hoja del árbol, así que se calcula una sola vez aquí. */
+    this.distanceToEnemyHome = [];
+    for (let p = 0; p < this.playerCount; p++) {
+      const sources = [];
+      for (let v = 0; v < n; v++) {
+        if (this.homeOwner[v] !== EMPTY && this.homeOwner[v] !== p) sources.push(v);
+      }
+      this.distanceToEnemyHome.push(multiSourceDistances(this.poly.neighbors, sources));
+    }
 
     this.turn = 0;
     this.chain = null;          // vértice obligado a seguir comiendo, o null
+    /* Quién comió por última vez. Es el desempate final del límite sin
+       capturas, y no es un detalle: dos ordenadores del mismo nivel sobre un
+       tablero simétrico se copian el uno al otro y llegan al límite con el
+       mismo marcador y las mismas fichas, así que sin esto la partida seguía
+       siendo tablas. Con esto, en todo momento hay exactamente un bando que
+       está perdiendo el reloj y tiene que buscar el contacto. */
+    this.lastCapturer = null;
     this.captured = new Array(this.playerCount).fill(0);
+    this.points = new Array(this.playerCount).fill(0);   // puntos de invasión
     this.eliminated = new Array(this.playerCount).fill(false);
     this.pliesWithoutCapture = 0;
     this.moveNumber = 1;
     this.history = [];          // para deshacer
     this.log = [];              // jugadas en notación legible
     this.result = null;         // {winner, reason} cuando la partida acaba
+  }
+
+  /* ¿Es `v` un vértice del campo de un rival de `player`? */
+  isEnemyHome(v, player) {
+    const owner = this.homeOwner[v];
+    return owner !== EMPTY && owner !== player;
   }
 
   /* Con dos jugadores, "el rival". Con más, se usa `isEnemy`. */
@@ -159,6 +237,8 @@ class Game {
       turn: this.turn,
       chain: this.chain,
       captured: this.captured.slice(),
+      lastCapturer: this.lastCapturer,
+      points: this.points.slice(),
       eliminated: this.eliminated.slice(),
       pliesWithoutCapture: this.pliesWithoutCapture,
       moveNumber: this.moveNumber,
@@ -172,6 +252,8 @@ class Game {
     this.turn = s.turn;
     this.chain = s.chain;
     this.captured = s.captured.slice();
+    this.lastCapturer = s.lastCapturer;
+    this.points = s.points.slice();
     this.eliminated = s.eliminated.slice();
     this.pliesWithoutCapture = s.pliesWithoutCapture;
     this.moveNumber = s.moveNumber;
@@ -201,18 +283,39 @@ class Game {
     if (legal.capture) {
       this.pieces[legal.over] = EMPTY;
       this.captured[player]++;
+      this.lastCapturer = player;
       this.pliesWithoutCapture = 0;
     } else {
       this.pliesWithoutCapture++;
     }
 
+    /* Invasión: pisar el campo de un rival vale un punto, tanto si se ha
+       llegado andando como saltando, y también en cada salto intermedio de una
+       cadena. Cuenta como progreso, igual que comer, para el límite de jugadas
+       muertas. */
+    let scored = false;
+    if (this.options.victory === 'invasion' && this.isEnemyHome(legal.to, player)) {
+      this.points[player]++;
+      this.pliesWithoutCapture = 0;
+      scored = true;
+    }
+
     this.log.push({
       player,
       moveNumber: this.moveNumber,
-      text: legal.capture
-        ? `${legal.from}×${legal.over}→${legal.to}`
-        : `${legal.from}→${legal.to}`,
+      text:
+        (legal.capture
+          ? `${legal.from}×${legal.over}→${legal.to}`
+          : `${legal.from}→${legal.to}`) + (scored ? '★' : ''),
     });
+
+    /* La partida se acaba en el momento de conseguir el punto que falta,
+       aunque la ficha pudiera seguir comiendo. */
+    if (scored && this.points[player] >= this.pointTarget[player]) {
+      this.chain = null;
+      this.result = { winner: player, reason: 'invasion' };
+      return true;
+    }
 
     const canChain =
       legal.capture &&
@@ -280,8 +383,18 @@ class Game {
         this.result = { winner: rival, reason: 'bloqueado' };
         return;
       }
+      /* Al agotarse el límite sin capturas la partida se cierra, pero no
+         necesariamente en tablas: con la regla por puntos la decide el
+         marcador. Es lo que evita el bloqueo pasivo de los finales, donde
+         acercarse cuesta una ficha —el que da el paso ofrece el primer salto—
+         y a los dos les compensa esperar. Si el reloj corona al que va por
+         delante, el que va por detrás está obligado a buscar el contacto.
+
+         Solo se aplica aquí: quedarse sin fichas o sin movimientos sigue
+         siendo derrota aunque el bloqueado haya comido más. */
       if (this.pliesWithoutCapture >= this.options.drawPlies) {
         this.result = { winner: null, reason: 'tablas' };
+        this.applyVictoryRule();
       }
       return;
     }
@@ -315,30 +428,61 @@ class Game {
 
   /* Con la regla por puntos, el ganador es quien más ha comido, aunque le
      hubieran eliminado. Sirve contra el "kingmaking": si te eliminan pronto tu
-     marcador sigue contando, así que no te da igual a quién ayudas. */
+     marcador sigue contando, así que no te da igual a quién ayudas. A dos
+     jugadores es lo que decide la partida al agotarse el límite sin capturas.
+
+     Solo hay tablas si además empatan en fichas sobre el tablero. */
   applyVictoryRule() {
-    if (this.options.victory !== 'points' || !this.result) return;
-    let best = [];
-    let top = -1;
-    for (let p = 0; p < this.playerCount; p++) {
-      const score = this.captured[p];
-      if (score > top) {
-        top = score;
-        best = [p];
-      } else if (score === top) {
-        best.push(p);
+    const rule = this.options.victory;
+    if (!this.result || (rule !== 'points' && rule !== 'invasion')) return;
+
+    /* Criterios en orden de importancia. Con la regla por puntos manda lo
+       comido; con la de invasión mandan los puntos de invasión y comer solo
+       desempata, que es lo que lo convierte en un medio y no en un fin. En
+       ambos casos, a igualdad, decide quién conserva más fichas. */
+    const keys = (p) => {
+      const base =
+        rule === 'invasion'
+          ? [this.points[p], this.captured[p], this.piecesOf(p).length]
+          : [this.captured[p], this.piecesOf(p).length];
+      /* Último desempate: quien dio el último bocado. Dos ordenadores del
+         mismo nivel sobre un tablero simétrico se copian y llegan al límite
+         empatados en todo, así que sin esta clave la partida acababa igual en
+         tablas. Con ella siempre hay uno que está perdiendo el reloj y tiene
+         que buscar el contacto. */
+      base.push(this.lastCapturer === p ? 1 : 0);
+      return base;
+    };
+
+    const table = [];
+    for (let p = 0; p < this.playerCount; p++) table.push({ player: p, keys: keys(p) });
+    const compare = (a, b) => {
+      for (let i = 0; i < a.keys.length; i++) {
+        if (a.keys[i] !== b.keys[i]) return b.keys[i] - a.keys[i];
       }
+      return 0;
+    };
+    table.sort(compare);
+
+    if (table.length > 1 && compare(table[0], table[1]) === 0) {
+      this.result = { winner: null, reason: 'empate-a-puntos' };
+      return;
     }
-    // Desempata quien conserve más fichas en el tablero.
-    if (best.length > 1) {
-      best.sort((a, b) => this.piecesOf(b).length - this.piecesOf(a).length);
-      const survivors = this.piecesOf(best[0]).length;
-      if (this.piecesOf(best[1]).length === survivors) {
-        this.result = { winner: null, reason: 'empate-a-puntos' };
-        return;
-      }
-    }
-    this.result = { winner: best[0], reason: 'puntos' };
+    /* Si lo único que los separa es la última clave, la partida la decide el
+       último bocado y el resultado tiene que decirlo así. */
+    const last = table[0].keys.length - 1;
+    const byLastCapture =
+      table.length > 1 &&
+      table[0].keys.every((k, i) => i === last || k === table[1].keys[i]);
+
+    this.result = {
+      winner: table[0].player,
+      reason: byLastCapture
+        ? 'ultimo-bocado'
+        : rule === 'invasion'
+          ? 'invasion-puntos'
+          : 'puntos',
+    };
   }
 
   undo() {
