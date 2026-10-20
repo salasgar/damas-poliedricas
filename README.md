@@ -460,3 +460,7 @@ decididas de antemano.
 - Equipos (2 contra 2) en los tableros grandes.
 - Más grafos: producto por K₂ de los mejores tableros, cilindro y banda de
   Möbius, esferas geodésicas, circulantes C_n(1,k).
+
+## Autor
+
+© 2026 Juan Luis Salas García.

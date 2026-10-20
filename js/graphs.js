@@ -1,3 +1,5 @@
+/* Damas poliédricas · Copyright © 2026 Juan Luis Salas García */
+
 'use strict';
 
 /* Tableros que no salen de un poliedro.

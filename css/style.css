@@ -1,3 +1,5 @@
+/* Damas poliédricas · Copyright © 2026 Juan Luis Salas García */
+
 :root {
   --p0: #4fc3f7;
   --p1: #ff8a65;
@@ -130,6 +132,16 @@ html, body {
   color: var(--muted);
 }
 .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+
+.copyright {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 0.75;
+  pointer-events: none;
+}
 
 .players { display: flex; flex-direction: column; gap: 8px; }
 

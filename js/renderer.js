@@ -1,3 +1,5 @@
+/* Damas poliédricas · Copyright © 2026 Juan Luis Salas García */
+
 'use strict';
 
 /* Render 3D del poliedro sobre un canvas 2D.

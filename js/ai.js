@@ -1,3 +1,5 @@
+/* Damas poliédricas · Copyright © 2026 Juan Luis Salas García */
+
 'use strict';
 
 /* Jugador automático: minimax con poda alfa-beta.

@@ -1,3 +1,5 @@
+/* Damas poliédricas · Copyright © 2026 Juan Luis Salas García */
+
 'use strict';
 
 /* Interacción: ratón/táctil sobre el canvas, panel lateral y bucle de dibujo. */
