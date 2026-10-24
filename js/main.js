@@ -360,16 +360,8 @@
     view.threatened.clear();
     if (!settings.showThreats || game.result) return;
 
-    // Simulamos el turno del rival para ver a qué fichas nuestras llega.
-    const me = game.turn;
-    const rival = 1 - me;
-    for (let over = 0; over < game.pieces.length; over++) {
-      if (game.pieces[over] !== me) continue;
-      const nb = game.poly.neighbors[over];
-      const attacker = nb.some((a) => game.pieces[a] === rival);
-      const landing = nb.some((t) => game.pieces[t] === EMPTY);
-      if (attacker && landing) view.threatened.add(over);
-    }
+    // El motor simula el turno de cada rival vivo y dice a qué fichas nuestras llega.
+    for (const v of game.threatenedPieces(game.turn)) view.threatened.add(v);
   }
 
   /* ---------- Panel ---------- */

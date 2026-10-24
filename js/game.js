@@ -351,6 +351,62 @@ class Game {
     return jumps;
   }
 
+  /* Fichas de `player` que algún rival vivo podría comer si le tocase ahora
+     mismo. Usa las mismas reglas de salto que el motor (movesFrom y
+     movesFromAfterCapture) y respeta la opción de cadenas: con cadenas
+     activas también cuentan las fichas alcanzables en el segundo salto y los
+     siguientes. Simula en el propio tablero y lo deja como estaba. */
+  threatenedPieces(player) {
+    const threatened = new Set();
+    if (this.result) return threatened;
+
+    const savedTurn = this.turn;
+    const savedChain = this.chain;
+    const chains = this.options.chainCaptures !== 'off';
+
+    /* Sigue la cadena desde `v`, donde acaba de aterrizar una ficha rival. */
+    const follow = (v) => {
+      for (const jump of this.movesFromAfterCapture(v)) {
+        if (this.pieces[jump.over] === player) threatened.add(jump.over);
+        const eaten = this.pieces[jump.over];
+        this.pieces[jump.to] = this.turn;
+        this.pieces[v] = EMPTY;
+        this.pieces[jump.over] = EMPTY;
+        follow(jump.to);
+        this.pieces[jump.over] = eaten;
+        this.pieces[v] = this.turn;
+        this.pieces[jump.to] = EMPTY;
+      }
+    };
+
+    try {
+      this.chain = null;
+      for (let rival = 0; rival < this.playerCount; rival++) {
+        if (rival === player || this.eliminated[rival]) continue;
+        this.turn = rival;
+        for (const from of this.piecesOf(rival)) {
+          for (const m of this.movesFrom(from)) {
+            if (!m.capture) continue;
+            if (this.pieces[m.over] === player) threatened.add(m.over);
+            if (!chains) continue;
+            const eaten = this.pieces[m.over];
+            this.pieces[m.to] = rival;
+            this.pieces[from] = EMPTY;
+            this.pieces[m.over] = EMPTY;
+            follow(m.to);
+            this.pieces[m.over] = eaten;
+            this.pieces[from] = rival;
+            this.pieces[m.to] = EMPTY;
+          }
+        }
+      }
+    } finally {
+      this.turn = savedTurn;
+      this.chain = savedChain;
+    }
+    return threatened;
+  }
+
   endTurn() {
     if (this.result) return;
     this.chain = null;
